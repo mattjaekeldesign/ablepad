@@ -1,0 +1,18 @@
+# --- viz (documentation viewer) ---
+node_modules/
+dist-viz/
+.vite/
+
+# --- python rig (Phase 2 onward) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- runtime artefacts on the Beelink ---
+logs/
+runtime_state.json
+
+# --- os ---
+.DS_Store
+Thumbs.db

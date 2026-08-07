@@ -1,0 +1,14 @@
+# Phase 0 baseline. Add nothing here without saying which layer needs it and why.
+
+# --- Drivers layer: MIDI I/O ---
+mido==1.3.3
+python-rtmidi==1.5.8       # mido backend; the actual Windows MIDI binding
+
+# --- Services layer: process supervision ---
+psutil==6.1.0              # Ableton launch/supervise/recover (Phase 5)
+
+# --- Configuration layer ---
+PyYAML==6.0.2              # rig.yaml, sets.yaml
+
+# --- Tests ---
+pytest==8.3.4

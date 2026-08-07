@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ablepad — Master Tree</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand">
+        <span class="dot"></span>
+        <strong>ablepad</strong>
+        <span class="sub">rig architecture trees</span>
+      </div>
+
+      <div class="views" role="group" aria-label="View mode">
+        <button data-view="split" class="active">Side by side</button>
+        <button data-view="projected">Projected only</button>
+        <button data-view="master">Master only</button>
+      </div>
+
+      <div class="tools">
+        <button id="fit" title="Fit both panes to content">Fit</button>
+        <button id="reset" title="Reset zoom to 100%">100%</button>
+        <button id="legend-toggle" title="Show / hide the colour legend">Legend</button>
+      </div>
+    </header>
+
+    <section id="legend" class="legend">
+      <span class="key k-done">Done — exit test passed</span>
+      <span class="key k-partial">Partial — started, not proven</span>
+      <span class="key k-todo">Not started</span>
+      <span class="key k-verified">Verified against hardware/manual</span>
+      <span class="key k-unverified">UNVERIFIED — guess, load-bearing</span>
+      <span class="key k-decision">Deferred decision / branch point</span>
+      <span class="key k-riskhigh">High risk</span>
+      <span class="key k-next">Next action</span>
+      <span class="hint">scroll = zoom · drag = pan · edit <code>viz/trees/*.mmd</code> and save</span>
+    </section>
+
+    <main id="stage" class="stage view-split">
+      <section class="pane" data-pane="projected">
+        <h2 class="pane-title">
+          <span class="tag tag-projected">PROJECTED</span>
+          the plan — every branch, including undecided ones
+        </h2>
+        <div class="viewport"><div class="canvas" id="canvas-projected"></div></div>
+      </section>
+
+      <div class="divider" aria-hidden="true"></div>
+
+      <section class="pane" data-pane="master">
+        <h2 class="pane-title">
+          <span class="tag tag-master">MASTER</span>
+          the truth — what actually exists on disk
+        </h2>
+        <div class="viewport"><div class="canvas" id="canvas-master"></div></div>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

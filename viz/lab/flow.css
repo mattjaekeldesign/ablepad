@@ -1,0 +1,210 @@
+/* viz/lab/flow.css — the mode-flow map (flow.js owns every element styled here).
+   Tokens come from lab.css :root (same zinc-dark scale as viz/style.css); this file
+   defines no colours of its own. All classes are fl-prefixed. */
+
+/* The shell shows/hides #stage-flow with .hidden; the :not() guard keeps this rule
+   from ever out-specifying that toggle. */
+#stage-flow:not(.hidden) {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------------------------------------------------------------- toolbar */
+.fl-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  flex: none;
+}
+
+.fl-btn {
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+}
+.fl-btn:hover { background: var(--accent); border-color: var(--border-strong); }
+
+.fl-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+/* ---------------------------------------------------------------- canvas
+   n8n-style dotted grid. The dots sit on the viewport (not the transformed layer),
+   so they read as the table the cards sit on rather than moving artwork. */
+.fl-viewport {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+  background:
+    radial-gradient(circle, var(--border) 1px, transparent 1px) 0 0 / 22px 22px,
+    var(--background);
+}
+.fl-viewport.fl-grabbing { cursor: grabbing; }
+.fl-viewport.fl-grabbing .fl-node { cursor: grabbing; }
+
+/* One transform moves edges, nodes and pills together (flow.js writes it, rAF-coalesced). */
+.fl-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.fl-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+.fl-empty.hidden { display: none; }
+
+/* ---------------------------------------------------------------- nodes */
+.fl-node {
+  position: absolute;
+  /* width is set inline from NODE_W in flow.js — the one constant both sides share */
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  z-index: 2;
+}
+.fl-node:hover { border-color: var(--border-strong); }
+.fl-node.fl-selected { z-index: 3; border-color: var(--border-strong); }
+
+/* The OPEN config — the one whose grid/inspector state is live in the editor. */
+.fl-node.fl-open {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 1px var(--ring);
+}
+
+/* Ghost stub: a SWITCH_MODE target or transition that points at no config. Rendered,
+   never hidden — a dangling reference is exactly the bug this view exists to catch. */
+.fl-node.fl-ghost {
+  background: transparent;
+  border-style: dashed;
+  cursor: default;
+  z-index: 1;
+}
+.fl-node.fl-ghost .fl-node-name { color: var(--muted-foreground); }
+
+.fl-node-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+.fl-node:not(.fl-ghost) .fl-node-head { border-bottom: 1px solid var(--border); }
+
+.fl-node-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fl-chip {
+  flex: none;
+  padding: 1px 7px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.fl-chip-missing { background: transparent; border-style: dashed; }
+
+/* 9x9 idle-LED thumbnail, painted cell-by-cell from flow.js via ledHex. */
+.fl-thumb {
+  display: grid;
+  grid-template-columns: repeat(9, 5px);
+  grid-auto-rows: 5px;
+  gap: 1px;
+  justify-content: center;
+  padding: 10px;
+  background: var(--card-2);
+}
+.fl-thumb span { border-radius: 1px; }
+
+.fl-node-foot {
+  padding: 6px 10px;
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  border-top: 1px solid var(--border);
+}
+
+/* ---------------------------------------------------------------- edges
+   1x1 SVG + overflow visible: paths draw anywhere in layer space, no sizing maths.
+   The svg itself ignores the pointer; only the fat hit paths take hover. */
+.fl-edges {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.fl-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+}
+
+.fl-edge-line {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.fl-edge.fl-hot .fl-edge-line {
+  stroke: var(--foreground);
+  marker-end: url(#fl-arrow-hot);
+}
+
+/* Edge into a ghost node — dashed, same as the stub it lands on. */
+.fl-edge-ghost .fl-edge-line { stroke-dasharray: 5 4; }
+
+.fl-arrowhead { fill: var(--border-strong); }
+.fl-arrowhead-hot { fill: var(--foreground); }
+
+/* Label pill on the edge midpoint: the `on` event, or "pad N (· hold Ns)". */
+.fl-pill {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 2px 8px;
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  z-index: 1;
+  cursor: default;
+}
+.fl-pill.fl-hot {
+  color: var(--foreground);
+  background: var(--accent);
+  border-color: var(--border-strong);
+}

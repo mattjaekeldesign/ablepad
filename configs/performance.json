@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "performance",
+  "name": "Performance",
+  "kind": "mode",
+  "description": "Live playing surface: the bottom-row tone pads send raw CC messages toward Ableton, and PANIC on the right column is the always-available mute. Browse (top right, 1 s hold) returns to the Set Browser.",
+  "background": { "type": "off" },
+  "pads": {
+    "11": { "label": "Tone A", "led": { "idle": { "type": "static", "palette": 37 }, "pressed": { "type": "static", "palette": 13 } }, "action": { "type": "SEND_MIDI", "params": { "message": "B0 14 7F" } } },
+    "12": { "label": "Tone B", "led": { "idle": { "type": "static", "palette": 37 }, "pressed": { "type": "static", "palette": 13 } }, "action": { "type": "SEND_MIDI", "params": { "message": "B0 15 7F" } } },
+    "13": { "label": "Tone C", "led": { "idle": { "type": "static", "palette": 37 }, "pressed": { "type": "static", "palette": 13 } }, "action": { "type": "SEND_MIDI", "params": { "message": "B0 16 7F" } } },
+    "14": { "label": "Tone D", "led": { "idle": { "type": "static", "palette": 37 }, "pressed": { "type": "static", "palette": 13 } }, "action": { "type": "SEND_MIDI", "params": { "message": "B0 17 7F" } } },
+    "19": { "label": "PANIC", "led": { "idle": { "type": "static", "palette": 5 }, "pressed": { "type": "static", "palette": 13 } }, "action": { "type": "PANIC_MUTE", "params": {} } },
+    "98": { "label": "Browse", "led": { "idle": { "type": "static", "palette": 23 }, "pressed": { "type": "static", "palette": 21 } }, "action": { "type": "SWITCH_MODE", "params": { "target": "set-browser" }, "hold_ms": 1000 } }
+  },
+  "transitions": [{ "on": "SWITCH_MODE", "to": "set-browser" }],
+  "notes": "These SEND_MIDI bindings mock the layout only. Whether performance pads route through Python, a virtual MIDI port, or Bome to Ableton's DAW port is the deliberately deferred Phase 8 decision — MIDI input exclusivity on Windows is unsolved, not solved.",
+  "meta": { "flowPos": { "x": 760, "y": 40 } }
+}

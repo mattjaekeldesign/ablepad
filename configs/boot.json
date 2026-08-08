@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "boot",
+  "name": "Boot",
+  "kind": "mode",
+  "description": "Display-only startup screen: no pad accepts input while the controller brings up MIDI, audio and Ableton. The bottom row is a placeholder for the progress bar the rig fills left to right as each subsystem comes up.",
+  "background": { "type": "off" },
+  "pads": {
+    "11": { "label": "", "led": { "idle": { "type": "static", "palette": 23 } }, "action": { "type": "NONE", "params": {} } },
+    "12": { "label": "", "led": { "idle": { "type": "static", "palette": 23 } }, "action": { "type": "NONE", "params": {} } },
+    "13": { "label": "", "led": { "idle": { "type": "static", "palette": 23 } }, "action": { "type": "NONE", "params": {} } },
+    "14": { "label": "", "led": { "idle": { "type": "static", "palette": 23 } }, "action": { "type": "NONE", "params": {} } },
+    "15": { "label": "", "led": { "idle": { "type": "static", "palette": 23 } }, "action": { "type": "NONE", "params": {} } },
+    "16": { "label": "", "led": { "idle": { "type": "static", "palette": 23 } }, "action": { "type": "NONE", "params": {} } },
+    "17": { "label": "", "led": { "idle": { "type": "static", "palette": 23 } }, "action": { "type": "NONE", "params": {} } },
+    "18": { "label": "", "led": { "idle": { "type": "static", "palette": 23 } }, "action": { "type": "NONE", "params": {} } },
+    "99": { "label": "", "led": { "idle": { "type": "pulse", "palette": 37 } }, "action": { "type": "NONE", "params": {} } }
+  },
+  "transitions": [{ "on": "BOOT_COMPLETE", "to": "set-browser" }],
+  "notes": "The logo pulses turquoise for the whole boot. The real controller emits BOOT_COMPLETE only after Launchpad, Scarlett and Ableton are all confirmed; until then every press is ignored by design.",
+  "meta": { "flowPos": { "x": 40, "y": 40 } }
+}

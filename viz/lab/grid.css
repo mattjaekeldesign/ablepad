@@ -1,0 +1,179 @@
+/* ---------------------------------------------------------------- lg- grid
+   Styles for viz/lab/grid.js — the on-screen Launchpad X. All classes are
+   lg-prefixed; every colour comes from the :root tokens in lab.css, except the
+   LED "off" shade #101013 which is palette truth (palette.js index 0), not theme.
+
+   Sizing strategy: .lg-stage is a size container, the board is 100cqmin square —
+   1:1 aspect, centred, scales to whatever the flexing pane allows. Pad text uses
+   cqmin units so ids and labels shrink with the hardware. */
+
+.lg-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+/* ---------------------------------------------------------------- header strip */
+.lg-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  font-size: 12px;
+}
+
+.lg-name { color: var(--foreground); font-weight: 600; }
+.lg-name.lg-muted { color: var(--muted-foreground); font-weight: 400; }
+
+.lg-sim-badge {
+  display: none;
+  padding: 1px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: calc(var(--radius) / 2);
+  background: var(--accent);
+  color: var(--foreground);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.lg-sim-badge.lg-on { display: inline-block; }
+
+.lg-legend {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+/* ---------------------------------------------------------------- stage */
+.lg-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--background);
+  container-type: size; /* makes 100cqmin below mean "largest square that fits" */
+}
+
+.lg-empty {
+  display: none;
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.lg-stage.lg-no-config .lg-empty { display: block; }
+.lg-stage.lg-no-config .lg-board { display: none; }
+
+/* ---------------------------------------------------------------- board
+   9×9 CSS grid; grid.js appends pads row 9 (top) → row 1, cols 1 → 9, so
+   source order IS placement order. The chassis look comes from the card border. */
+.lg-board {
+  width: 90cqmin; /* square by construction: 9 equal rows × 9 equal columns */
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  grid-template-rows: repeat(9, 1fr);
+  gap: 1.4cqmin;
+  padding: 2.4cqmin;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------------- pads */
+.lg-pad {
+  position: relative;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 1.2cqmin; /* rounded square — the 8×8 note pads */
+  background: #101013; /* LED off — palette index 0, not a theme token */
+  cursor: pointer;
+  overflow: hidden;
+  touch-action: none; /* sim mode uses pointer capture; no scroll fighting */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Unbound pads sit visually behind bound ones: no edge to catch the eye. */
+.lg-pad:not(.lg-bound) { border-color: transparent; }
+
+/* cc-top / cc-right function buttons: smaller and rounder than note pads. */
+.lg-kind-cc-top,
+.lg-kind-cc-right {
+  width: 78%;
+  height: 78%;
+  place-self: center;
+  border-radius: 32%;
+}
+
+/* Logo pad (99): the round Novation badge, light-only. */
+.lg-kind-logo {
+  width: 70%;
+  height: 70%;
+  place-self: center;
+  border-radius: 50%;
+  border-style: dashed; /* reads as "not a button" at a glance */
+  border-color: var(--border);
+}
+
+/* Faint pad id, top-left corner. Design aid, never content. */
+.lg-pad-id {
+  position: absolute;
+  top: 0.5cqmin;
+  left: 0.9cqmin;
+  font-size: max(6px, 1.7cqmin);
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.32);
+  pointer-events: none;
+}
+
+/* User label, centred; shadowed so it survives any LED colour underneath. */
+.lg-pad-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6%;
+  font-size: max(7px, 2cqmin);
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- selection
+   Edit-mode ring: --ring haloed in white so it stays visible over any LED colour. */
+.lg-pad.lg-selected {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--ring),
+    0 0 0 3px rgba(255, 255, 255, 0.9);
+  z-index: 1;
+}
+
+/* ---------------------------------------------------------------- simulate mode */
+.lg-stage.lg-simming .lg-pad { cursor: crosshair; }
+.lg-stage.lg-simming .lg-kind-logo { cursor: default; } /* light-only: no press */
+
+.lg-pad.lg-pressed { transform: scale(0.94); } /* finger-down feedback */
+
+/* Hold-to-confirm progress: a conic sweep masked to a ring. grid.js drives
+   --lg-progress 0→1 from its single rAF loop over the action's hold_ms. */
+.lg-hold-ring {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: conic-gradient(#fff calc(var(--lg-progress, 0) * 360deg), transparent 0);
+  -webkit-mask: radial-gradient(closest-side, transparent 70%, #000 72%);
+  mask: radial-gradient(closest-side, transparent 70%, #000 72%);
+  pointer-events: none;
+  z-index: 2;
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "error",
+  "name": "Error",
+  "kind": "mode",
+  "description": "Fault screen: a red centre block plus a flashing logo signal that the rig has stopped. Retry (bottom left) returns to the Set Browser once the operator has addressed the fault.",
+  "background": { "type": "off" },
+  "pads": {
+    "44": { "label": "", "led": { "idle": { "type": "static", "palette": 5 } }, "action": { "type": "NONE", "params": {} } },
+    "45": { "label": "", "led": { "idle": { "type": "static", "palette": 5 } }, "action": { "type": "NONE", "params": {} } },
+    "54": { "label": "", "led": { "idle": { "type": "static", "palette": 5 } }, "action": { "type": "NONE", "params": {} } },
+    "55": { "label": "", "led": { "idle": { "type": "static", "palette": 5 } }, "action": { "type": "NONE", "params": {} } },
+    "99": { "label": "", "led": { "idle": { "type": "flash", "palette": 5, "paletteB": 0 } }, "action": { "type": "NONE", "params": {} } },
+    "11": { "label": "Retry", "led": { "idle": { "type": "static", "palette": 19 }, "pressed": { "type": "static", "palette": 21 } }, "action": { "type": "SWITCH_MODE", "params": { "target": "set-browser" } } }
+  },
+  "transitions": [{ "on": "SWITCH_MODE", "to": "set-browser" }],
+  "notes": "The real rig names the fault by scrolling text across the pads via SysEx 07h — 'NO ASIO', 'SET MISSING', 'LP LOST' — cheaper than a colour code anyone has to memorise. The Lab only mocks the static look; scrolling is hardware-side.",
+  "meta": { "flowPos": { "x": 760, "y": 260 } }
+}

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ablepad — config lab</title>
+    <link rel="stylesheet" href="./lab.css" />
+    <link rel="stylesheet" href="./library.css" />
+    <link rel="stylesheet" href="./grid.css" />
+    <link rel="stylesheet" href="./flow.css" />
+    <link rel="stylesheet" href="./inspector.css" />
+  </head>
+  <body>
+    <!-- ─────────────────────────────────────────────────────────── topbar -->
+    <header class="header">
+      <div class="brand">
+        <span class="logo">ap</span>
+        <div class="brand-text">
+          <strong>config lab</strong>
+          <span class="muted">Launchpad layouts · LED preview · button mapping</span>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="View">
+        <button role="tab" data-view="grid" class="tab active">Mapper</button>
+        <button role="tab" data-view="flow" class="tab">Flow</button>
+      </div>
+
+      <div class="actions">
+        <button id="sim-toggle" class="btn ghost" title="Simulate mode — press pads, watch LEDs, follow transitions (Space)">
+          ▶ Simulate
+        </button>
+        <span id="dirty-flag" class="dirty-flag" hidden>● unsaved</span>
+        <button id="save" class="btn" title="Save the open config (⌘S)">Save</button>
+        <a class="btn ghost" href="../" title="Back to the architecture trees">Trees</a>
+      </div>
+    </header>
+
+    <!-- ──────────────────────────────────────────── three-pane workspace -->
+    <div class="shell">
+      <aside id="library" class="panel-left"></aside>
+      <main class="stage">
+        <section id="stage-grid"></section>
+        <section id="stage-flow" class="hidden"></section>
+      </main>
+      <aside id="inspector" class="panel-right"></aside>
+    </div>
+
+    <!-- toasts render here; lab.js owns them -->
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+
+    <script type="module" src="./lab.js"></script>
+  </body>
+</html>

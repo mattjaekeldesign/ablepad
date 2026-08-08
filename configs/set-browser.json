@@ -1,0 +1,480 @@
+{
+  "schemaVersion": 1,
+  "id": "set-browser",
+  "name": "Set Browser",
+  "kind": "mode",
+  "description": "Pick an Ableton set: the top two grid rows are 16 demo set slots, each gated by the roadmap's 2 s hold-to-confirm before it loads. The loaded slot pulses bright green.",
+  "background": {
+    "type": "off"
+  },
+  "pads": {
+    "19": {
+      "label": "Rescan",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 13
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "RESCAN_SETS",
+        "params": {}
+      }
+    },
+    "71": {
+      "label": "Set 9",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 8
+        },
+        "hold_ms": 2000
+      }
+    },
+    "72": {
+      "label": "Set 10",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 9
+        },
+        "hold_ms": 2000
+      }
+    },
+    "73": {
+      "label": "Set 11",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 10
+        },
+        "hold_ms": 2000
+      }
+    },
+    "74": {
+      "label": "Set 12",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 11
+        },
+        "hold_ms": 2000
+      }
+    },
+    "75": {
+      "label": "Set 13",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 12
+        },
+        "hold_ms": 2000
+      }
+    },
+    "76": {
+      "label": "Set 14",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 13
+        },
+        "hold_ms": 2000
+      }
+    },
+    "77": {
+      "label": "Set 15",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 14
+        },
+        "hold_ms": 2000
+      }
+    },
+    "78": {
+      "label": "Set 16",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 15
+        },
+        "hold_ms": 2000
+      }
+    },
+    "81": {
+      "label": "Set 1",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 0
+        },
+        "hold_ms": 2000
+      }
+    },
+    "82": {
+      "label": "Set 2",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 1
+        },
+        "hold_ms": 2000
+      }
+    },
+    "83": {
+      "label": "Set 3",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 2
+        },
+        "hold_ms": 2000
+      }
+    },
+    "84": {
+      "label": "Set 4",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 3
+        },
+        "hold_ms": 2000
+      }
+    },
+    "85": {
+      "label": "Set 5",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 4
+        },
+        "hold_ms": 2000
+      }
+    },
+    "86": {
+      "label": "Set 6",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 5
+        },
+        "hold_ms": 2000
+      }
+    },
+    "87": {
+      "label": "Set 7",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 6
+        },
+        "hold_ms": 2000
+      }
+    },
+    "88": {
+      "label": "Set 8",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 45
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        },
+        "active": {
+          "type": "pulse",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "LOAD_SET",
+        "params": {
+          "slot": 7
+        },
+        "hold_ms": 2000
+      }
+    },
+    "91": {
+      "label": "Prev",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 23
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "PAGE_PREV",
+        "params": {}
+      }
+    },
+    "92": {
+      "label": "Next",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 23
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 21
+        }
+      },
+      "action": {
+        "type": "PAGE_NEXT",
+        "params": {}
+      }
+    },
+    "98": {
+      "label": "System",
+      "led": {
+        "idle": {
+          "type": "static",
+          "palette": 5
+        },
+        "pressed": {
+          "type": "static",
+          "palette": 13
+        }
+      },
+      "action": {
+        "type": "SWITCH_MODE",
+        "params": {
+          "target": "system"
+        },
+        "hold_ms": 1000
+      }
+    }
+  },
+  "transitions": [
+    {
+      "on": "SET_LOADED",
+      "to": "performance"
+    }
+  ],
+  "notes": "The 16 slots here are demo placeholders — real slot count, names and colours come from the Phase 4 scanner plus sets.yaml, and pages beyond 16 arrive via the Prev/Next CCs. The top-row and right-column CC numbers are still UNVERIFIED hardware truth.",
+  "meta": {
+    "flowPos": {
+      "x": 374,
+      "y": -90
+    }
+  }
+}

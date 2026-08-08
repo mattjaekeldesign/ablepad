@@ -1,0 +1,142 @@
+/* ---------------------------------------------------------------- tokens
+   Same shadcn "zinc dark" scale as viz/style.css — the Lab is part of the same
+   tool family and must look like it. Component chrome lives in the per-component
+   files (library.css, grid.css, flow.css, inspector.css); THIS file owns tokens,
+   the topbar and the three-pane layout, nothing inside the panes. */
+:root {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #0c0c0f;
+  --card-2: #111114;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --primary: #fafafa;
+  --primary-foreground: #09090b;
+  --accent: #1f1f23;
+  --ring: #52525b;
+  --radius: 8px;
+  --header-h: 56px;
+  --led-off: #101013;
+  --ok: #4ade80;
+  --warn: #facc15;
+  --danger: #f87171;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  font: 13px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.muted { color: var(--muted-foreground); }
+.tiny { font-size: 11px; }
+.hidden { display: none !important; }
+code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .92em; color: #d4d4d8; }
+
+/* ---------------------------------------------------------------- topbar */
+.header {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.brand { display: flex; align-items: center; gap: 10px; }
+.logo {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border-radius: 6px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 700; font-size: 12px; letter-spacing: -.02em;
+}
+.brand-text { display: flex; flex-direction: column; line-height: 1.25; }
+.brand-text strong { font-size: 13px; letter-spacing: -.01em; }
+.brand-text .muted { font-size: 11px; }
+
+.tabs {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.tab {
+  border: 0; background: transparent;
+  color: var(--muted-foreground);
+  font: inherit; font-size: 12px; font-weight: 500;
+  padding: 5px 14px; border-radius: 6px; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.tab:hover { color: var(--foreground); }
+.tab.active { background: var(--card-2); color: var(--foreground); box-shadow: 0 1px 2px #0008; }
+
+.actions { display: flex; gap: 8px; align-items: center; }
+
+.btn {
+  font: inherit; font-size: 12px; font-weight: 500;
+  color: var(--foreground);
+  background: var(--accent);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.btn:hover { background: var(--muted); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.ghost { background: transparent; border-color: var(--border); color: var(--muted-foreground); }
+.btn.ghost:hover { color: var(--foreground); border-color: var(--border-strong); }
+.btn.ghost.on { color: var(--ok); border-color: var(--ok); }
+
+.dirty-flag { font-size: 11px; color: var(--warn); }
+
+/* ---------------------------------------------------------------- layout */
+.shell {
+  height: calc(100% - var(--header-h));
+  display: grid;
+  grid-template-columns: 240px 1fr 340px;
+}
+
+.panel-left  { border-right: 1px solid var(--border); background: var(--card); overflow-y: auto; }
+.panel-right { border-left: 1px solid var(--border); background: var(--card); overflow-y: auto; }
+
+.stage { position: relative; overflow: hidden; min-width: 0; }
+.stage > section { position: absolute; inset: 0; }
+
+/* ---------------------------------------------------------------- toasts */
+.toasts {
+  position: fixed;
+  bottom: 16px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  z-index: 100;
+  pointer-events: none;
+}
+.toast {
+  font-size: 12px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 4px 16px #000a;
+  animation: toast-in .15s ease-out;
+}
+.toast.ok    { border-color: #14532d; color: var(--ok); }
+.toast.warn  { border-color: #713f12; color: var(--warn); }
+.toast.error { border-color: #7f1d1d; color: var(--danger); }
+.toast.bye { opacity: 0; transition: opacity .3s; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }

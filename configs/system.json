@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "system",
+  "name": "System",
+  "kind": "mode",
+  "description": "Maintenance controls, deliberately hard to trigger: Ableton restart behind a 2 s hold, reboot behind a 4 s hold and shutdown behind a 6 s hold, matching the roadmap's Phase 6 confirm gates. Back (bottom left) returns to the Set Browser.",
+  "background": { "type": "off" },
+  "pads": {
+    "91": { "label": "Hotspot", "led": { "idle": { "type": "static", "palette": 45 }, "pressed": { "type": "static", "palette": 13 }, "active": { "type": "pulse", "palette": 21 } }, "action": { "type": "HOTSPOT_TOGGLE", "params": {} } },
+    "95": { "label": "Restart Live", "led": { "idle": { "type": "static", "palette": 13 }, "pressed": { "type": "static", "palette": 5 } }, "action": { "type": "ABLETON_RESTART", "params": {}, "hold_ms": 2000 } },
+    "97": { "label": "Reboot", "led": { "idle": { "type": "flash", "palette": 5, "paletteB": 0 }, "pressed": { "type": "static", "palette": 13 } }, "action": { "type": "SYSTEM_REBOOT", "params": {}, "hold_ms": 4000 } },
+    "98": { "label": "Shutdown", "led": { "idle": { "type": "static", "palette": 5 }, "pressed": { "type": "static", "palette": 13 } }, "action": { "type": "SYSTEM_SHUTDOWN", "params": {}, "hold_ms": 6000 } },
+    "11": { "label": "Back", "led": { "idle": { "type": "static", "palette": 19 }, "pressed": { "type": "static", "palette": 21 } }, "action": { "type": "SWITCH_MODE", "params": { "target": "set-browser" } } }
+  },
+  "transitions": [{ "on": "SWITCH_MODE", "to": "set-browser" }],
+  "notes": "Reboot flashes red as an attention state. Hotspot pulses green while the lifeline hotspot is up — that pad plus SSH from the phone is the only recovery path once the rig goes headless, which is why Phase 6 builds it before Phase 7 removes the monitor.",
+  "meta": { "flowPos": { "x": 400, "y": 260 } }
+}

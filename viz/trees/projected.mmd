@@ -1,175 +1,224 @@
 %% PROJECTED TREE — the plan.
-%% Every possible branching of the project, including decisions not yet made.
-%% Source of truth: docs/ROADMAP.md. Edit this file, not main.js.
-%% Status vocabulary: :::done :::partial :::todo :::verified :::unverified :::decision :::riskhigh
+%% Read top to bottom. Each subgraph is one PHASE. Each node is one numbered STEP.
+%% Source of truth: docs/ROADMAP.md. Edit this file, never main.js.
+%% Status classes: :::done :::partial :::todo :::verified :::unverified :::decision :::branch :::riskhigh
 
-flowchart LR
-    ROOT["ablepad<br/>Beelink Headless Ableton Rig"]:::root
+flowchart TB
 
-    %% ---------------------------------------------------------------- PHASE 0
-    ROOT --> P0["Phase 0 · Bench truth<br/>Risk: Low"]:::partial
-    P0 --> P0a["Windows LiveRig account + auto-login"]:::todo
-    P0 --> P0b["Focusrite driver + ASIO in Ableton"]:::todo
-    P0 --> P0c["Guitar to mixer makes sound"]:::todo
-    P0 --> P0d["Buffer / sample rate chosen"]:::todo
-    P0 --> P0e["Round-trip latency measured"]:::todo
-    P0 --> P0f["C:/LiveRig folder tree created"]:::todo
-    P0 --> P0g["Python 3.12 + Git + VSCode"]:::todo
-    P0 --> P0h["Repo scaffolding: venv, requirements"]:::todo
-    P0 --> P0i["Ableton exe path recorded verbatim"]:::todo
-    P0 --> P0j["Programmer's Reference Guide in /docs"]:::done
+%% ══════════════════════════════════════════════════════════ PHASE 0
+subgraph S0["PHASE 0 — BENCH TRUTH · Risk LOW · exit: 30 min of guitar, no dropouts"]
+    direction LR
+    P0(["PHASE 0<br/>prove the instrument before automating it"]):::partial
+    P0 --> A01["0.1 ○ Windows account 'LiveRig' + auto-login"]:::todo
+    P0 --> A02["0.2 ○ Focusrite driver installed, ASIO in Ableton"]:::todo
+    P0 --> A03["0.3 ○ Guitar → Scarlett → Ableton → mixer makes sound"]:::todo
+    P0 --> A04["0.4 ○ Buffer size + sample rate chosen and written down"]:::todo
+    P0 --> A05["0.5 ○ Round-trip latency measured and judged playable"]:::todo
+    P0 --> A06["0.6 ○ C:/LiveRig folder tree created"]:::todo
+    P0 --> A07["0.7 ○ Python 3.12+, Git, VSCode installed"]:::todo
+    P0 --> A08["0.8 ◐ repo, .gitignore, requirements.txt done<br/>venv still owed on the Beelink"]:::partial
+    P0 --> A09["0.9 ○ Ableton exe path recorded verbatim"]:::todo
+    P0 --> A10["0.10 ✓ Programmer's Reference Guide in /docs"]:::done
+end
 
-    %% ---------------------------------------------------------------- PHASE 1
-    ROOT --> P1["Phase 1 · Hardware truth<br/>Risk: Medium · MOST IMPORTANT"]:::riskhigh
-    P1 --> T1["tools/"]:::todo
-    T1 --> T1a["midi_port_inspector.py"]:::todo
-    T1 --> T1b["launchpad_note_tester.py"]:::todo
-    T1 --> T1c["led_color_tester.py"]:::todo
-    T1 --> T1d["led_batch_tester.py"]:::todo
-    T1 --> T1e["interface_name_inspector.py"]:::todo
+%% ══════════════════════════════════════════════════════════ PHASE 1
+subgraph S1["PHASE 1 — HARDWARE TRUTH · Risk MEDIUM · the most important phase"]
+    direction LR
+    P1(["PHASE 1<br/>output is verified constants, not features"]):::riskhigh
 
-    P1 --> F1["Facts to lock down"]
-    F1 --> F1a["Programmer Mode SysEx<br/>F0 00 20 29 02 0C 0E 01 F7"]:::verified
-    F1 --> F1b["Two MIDI ports on Windows<br/>DAW first, MIDI second"]:::verified
-    F1 --> F1c["Release = note-on velocity 0"]:::verified
-    F1 --> F1d["Batch LED write · 81 pads per SysEx"]:::verified
-    F1 --> F1e["Grid notes 11-88<br/>corners verified, interior inferred"]:::partial
-    F1 --> F1f["CC frame 91-98 / 19-89 / 99"]:::unverified
-    F1 --> F1g["Colour index 0-127<br/>8 of 128 confirmed"]:::unverified
-    F1 --> F1h["Windows port name strings"]:::unverified
-    F1 --> F1i["Focusrite friendly names"]:::unverified
-    F1 --> F1j["Ableton exe path"]:::unverified
+    P1 --> G1A["1.A BENCH TOOLS — written, none yet run on hardware"]:::partial
+    G1A --> B10["1.0 ◐ tools/_bench.py · shared lifecycle<br/>ONE restore contract, not five<br/>exit / exception / Ctrl+C / SIGTERM"]:::partial
+    G1A --> B11["1.1 ◐ tools/midi_port_inspector.py<br/>port names + open-ability probe<br/>run twice: ableton-closed, ableton-open"]:::partial
+    G1A --> B12["1.2 ◐ tools/launchpad_note_tester.py<br/>lights each LED, then records the press<br/>--frame does the 17 real unknowns first"]:::partial
+    G1A --> B13["1.3 ◐ tools/led_color_tester.py<br/>sweep 0-127, photograph both pages"]:::partial
+    G1A --> B14["1.4 ◐ tools/led_batch_tester.py<br/>confirm + time an 81-entry SysEx<br/>also measures the settle-time guess"]:::partial
+    G1A --> B15["1.5 ◐ tools/interface_name_inspector.py<br/>what Get-PnpDevice actually returns"]:::partial
 
-    P1 --> H1["Launchpad hardware settings, asserted at boot"]:::todo
-    H1 --> H1a["LED feedback external ON · SysEx 0Ah"]:::todo
-    H1 --> H1b["MSD Mode OFF · PHYSICAL ONLY, no SysEx"]:::todo
-    H1 --> H1c["Aftertouch OFF · SysEx 0Bh"]:::todo
-    H1 --> H1d["Velocity sensitivity OFF · SysEx 04h"]:::todo
-    H1 --> H1e["LED Sleep OFF · SysEx 09h"]:::todo
-    H1 --> H1f["Brightness from rig.yaml · SysEx 08h"]:::todo
+    P1 --> G1B["1.B FACTS — closed"]:::verified
+    G1B --> C11["1.6 ✓ Programmer Mode SysEx<br/>F0 00 20 29 02 0C 0E 01 F7 · p.7"]:::verified
+    G1B --> C12["1.7 ✓ Two MIDI ports on Windows<br/>DAW first, MIDI second · p.6"]:::verified
+    G1B --> C13["1.8 ✓ Release = note-on velocity 0 · p.6"]:::verified
+    G1B --> C14["1.9 ✓ Batch LED write, 81 pads/msg · p.15"]:::verified
 
-    P1 --> X1["EXIT: grid.py + colors.py hold measured values"]:::todo
+    P1 --> G1C["1.C FACTS — still open"]:::unverified
+    G1C --> D11["1.10 ◐ Grid notes 11-88<br/>corners verified p.14, interior inferred"]:::partial
+    G1C --> D12["1.11 ✗ CC frame 91-98 / 19-89 / 99"]:::unverified
+    G1C --> D13["1.12 ✗ Colour index 0-127 · 8 of 128 known"]:::unverified
+    G1C --> D14["1.13 ✗ Exact Windows MIDI port name strings"]:::unverified
+    G1C --> D15["1.14 ✗ Focusrite friendly names"]:::unverified
+    G1C --> D16["1.15 ✗ Ableton exe path"]:::unverified
 
-    %% ---------------------------------------------------------------- PHASE 2
-    ROOT --> P2["Phase 2 · Skeleton<br/>Risk: Low · off-Beelink buildable"]:::todo
-    P2 --> R2["rig/"]:::todo
-    R2 --> R2a["state.py · RigState enum"]:::todo
-    R2 --> R2b["controller.py · tick loop + transitions"]:::todo
-    R2 --> R2c["events.py · PadEvent, domain events"]:::todo
-    R2 --> R2d["commands.py · dispatcher interface"]:::todo
-    R2 --> R2e["exceptions.py"]:::todo
-    P2 --> S2["storage/"]:::todo
-    S2 --> S2a["config_loader.py · validate rig.yaml, fail loud"]:::todo
-    S2 --> S2b["runtime_state.py · atomic JSON write"]:::todo
-    P2 --> C2["config/rig.yaml"]:::todo
-    P2 --> M2["main.py · logging + entry point"]:::todo
-    P2 --> V2["tests/ · state machine + config validation"]:::todo
+    P1 --> G1D["1.D DEVICE SETTINGS asserted at every boot"]:::todo
+    G1D --> E11["1.16 ○ LED feedback external ON · SysEx 0Ah"]:::todo
+    G1D --> E12["1.17 ▲ MSD Mode OFF · PHYSICAL ONLY, no SysEx"]:::riskhigh
+    G1D --> E13["1.18 ○ Aftertouch OFF · SysEx 0Bh"]:::todo
+    G1D --> E14["1.19 ○ Velocity sensitivity OFF · SysEx 04h"]:::todo
+    G1D --> E15["1.20 ○ LED Sleep OFF · SysEx 09h"]:::todo
+    G1D --> E16["1.21 ○ Brightness from rig.yaml · SysEx 08h"]:::todo
 
-    %% ---------------------------------------------------------------- PHASE 3
-    ROOT --> P3["Phase 3 · Launchpad service<br/>Risk: Medium"]:::todo
-    P3 --> L3["launchpad/"]:::todo
-    L3 --> L3a["ports.py · discovery + name matching"]:::todo
-    L3 --> L3b["device.py · open/close, Programmer Mode, IO"]:::todo
-    L3 --> L3c["grid.py · FROM PHASE 1"]:::todo
-    L3 --> L3d["colors.py · FROM PHASE 1"]:::todo
-    L3 --> L3e["renderer.py · state to pad colours, pure"]:::todo
-    L3 --> L3f["animations.py · non-blocking, killable"]:::todo
-    L3 --> L3g["mappings.py · note to named action, per mode"]:::todo
-    L3 --> L3h["modes.py · LaunchpadMode enum"]:::todo
+    P1 --> X1{{"EXIT TEST 1<br/>grid.py + colors.py hold measured values<br/>with date and method in a comment"}}:::decision
+end
 
-    L3h --> MD1["Boot Mode"]:::todo
-    L3h --> MD2["Set Browser Mode"]:::todo
-    L3h --> MD3["Performance Mode"]:::todo
-    L3h --> MD4["System Mode"]:::todo
-    L3h --> MD5["Error Mode"]:::todo
+%% ══════════════════════════════════════════════════════════ PHASE 2
+subgraph S2["PHASE 2 — SKELETON · Risk LOW · the only phase buildable off the Beelink"]
+    direction LR
+    P2(["PHASE 2<br/>the spine everything hangs from"]):::todo
 
-    P3 --> K3["Killer requirement:<br/>restore Live mode in finally<br/>on exit, exception AND signal"]:::riskhigh
+    P2 --> G2A["2.A rig/ — domain core"]:::todo
+    G2A --> F21["2.1 ○ state.py · RigState enum"]:::todo
+    G2A --> F22["2.2 ○ controller.py · tick loop + transitions only"]:::todo
+    G2A --> F23["2.3 ○ events.py · PadEvent, domain events"]:::todo
+    G2A --> F24["2.4 ○ commands.py · dispatcher interface"]:::todo
+    G2A --> F25["2.5 ○ exceptions.py"]:::todo
 
-    %% ---------------------------------------------------------------- PHASE 4
-    ROOT --> P4["Phase 4 · Set browser<br/>Risk: Low"]:::todo
-    P4 --> B4["set_browser/"]:::todo
-    B4 --> B4a["scanner.py · find .als, skip backups"]:::todo
-    B4 --> B4b["models.py · LiveSet dataclass"]:::todo
-    B4 --> B4c["metadata.py · sets.yaml over scan"]:::todo
-    B4 --> B4d["pagination.py · past 48 sets"]:::todo
-    B4 --> B4e["service.py"]:::todo
+    P2 --> G2B["2.B storage/ — persistence"]:::todo
+    G2B --> F26["2.6 ○ config_loader.py · validate rig.yaml, fail loud"]:::todo
+    G2B --> F27["2.7 ○ runtime_state.py · atomic JSON write"]:::todo
 
-    %% ---------------------------------------------------------------- PHASE 5
-    ROOT --> P5["Phase 5 · Ableton launcher<br/>Risk: HIGH"]:::riskhigh
-    P5 --> A5["ableton/"]:::todo
-    A5 --> A5a["launcher.py · start, stop, restart"]:::todo
-    A5 --> A5b["process.py · psutil supervision"]:::todo
-    A5 --> A5c["readiness.py · running vs actually loaded"]:::todo
-    A5 --> A5d["recovery.py · attempt limits"]:::todo
-    P5 --> D5["KNOWN DEBT: readiness is a timing guess<br/>until a Live Remote Script sends READY"]:::unverified
+    P2 --> G2C["2.C entry + config"]:::todo
+    G2C --> F28["2.8 ○ config/rig.yaml"]:::todo
+    G2C --> F29["2.9 ○ main.py · logging setup, entry point"]:::todo
+    G2C --> F30["2.10 ○ tests/ · state machine + config validation"]:::todo
 
-    %% ---------------------------------------------------------------- PHASE 6
-    ROOT --> P6["Phase 6 · Lifeline<br/>Risk: Medium · BEFORE headless"]:::todo
-    P6 --> W6["windows/"]:::todo
-    W6 --> W6a["hotspot.py"]:::todo
-    W6 --> W6b["ssh.py · key auth only"]:::todo
-    W6 --> W6c["power.py · reboot 4s, shutdown 6s hold"]:::todo
-    W6 --> W6d["commands.py · rig-status, ableton-restart, collect-logs"]:::todo
-    P6 --> U6["Beelink adapter supports hosted hotspot?"]:::unverified
+    P2 --> X2{{"EXIT TEST 2<br/>illegal transitions rejected · Ctrl+C exits clean<br/>unit tests pass with zero hardware attached"}}:::decision
+end
 
-    %% ---------------------------------------------------------------- PHASE 7
-    ROOT --> P7["Phase 7 · Headless boot<br/>Risk: Medium"]:::todo
-    P7 --> P7a["Task Scheduler at logon, restart on failure"]:::todo
-    P7 --> P7b["Power plan: no sleep/hibernate/USB suspend"]:::todo
-    P7 --> P7c["Notifications + update reboots disabled"]:::todo
-    P7 --> P7d["Cold boot WITH monitor reaches Set Browser"]:::todo
-    P7 --> P7e["Cold boot with NO peripherals, same result"]:::todo
-    P7 --> P7f["Boot under 90 seconds"]:::todo
+%% ══════════════════════════════════════════════════════════ PHASE 3
+subgraph S3["PHASE 3 — LAUNCHPAD SERVICE · Risk MEDIUM · most common way the rig dies on stage"]
+    direction LR
+    P3(["PHASE 3<br/>the entire user interface"]):::todo
 
-    %% ---------------------------------------------------------------- PHASE 8
-    ROOT --> P8["Phase 8 · Performance layer<br/>Risk: HIGH · the deferred decision lands"]:::riskhigh
-    P8 --> Q8{"Who owns the Launchpad MIDI input?<br/>Windows port is exclusive"}:::decision
+    P3 --> G3A["3.A launchpad/ — driver"]:::todo
+    G3A --> H31["3.1 ○ ports.py · discovery + name matching"]:::todo
+    G3A --> H32["3.2 ○ device.py · open/close, Programmer Mode, IO"]:::todo
+    G3A --> H33["3.3 ○ grid.py · GENERATED BY PHASE 1"]:::todo
+    G3A --> H34["3.4 ○ colors.py · GENERATED BY PHASE 1"]:::todo
 
-    Q8 --> OA["OPTION A · Python owns the port"]:::branch
-    OA --> OA1["Ableton cannot see the Launchpad"]:::branch
-    OA --> OA2["Performance pads forwarded via virtual MIDI port"]:::branch
-    OA --> OA3["One language, one process, no licence cost"]:::branch
-    OA --> OA4["LED animation on a Python thread<br/>viable — batch SysEx verified"]:::branch
+    P3 --> G3B["3.B launchpad/ — presentation"]:::todo
+    G3B --> H35["3.5 ○ renderer.py · state → pad colours, pure"]:::todo
+    G3B --> H36["3.6 ○ animations.py · non-blocking, killable"]:::todo
+    G3B --> H37["3.7 ○ mappings.py · note → named action, per mode"]:::todo
 
-    Q8 --> OB["OPTION B · Bome MT Pro owns the port"]:::branch
-    OB --> OB1["Bome fans out: system pads to Python,<br/>performance pads to Ableton"]:::branch
-    OB --> OB2["Native timers + port-plugged triggers"]:::branch
-    OB --> OB3["~79 EUR, second always-on process"]:::branch
-    OB --> OB4["Python never touches MIDI"]:::branch
+    P3 --> G3C["3.C modes.py — LaunchpadMode enum"]:::todo
+    G3C --> M1["3.8 ○ Boot Mode"]:::todo
+    G3C --> M2["3.9 ○ Set Browser Mode"]:::todo
+    G3C --> M3["3.10 ○ Performance Mode"]:::todo
+    G3C --> M4["3.11 ○ System Mode"]:::todo
+    G3C --> M5["3.12 ○ Error Mode"]:::todo
 
-    P8 --> P8a["Panic mute from any mode"]:::todo
-    P8 --> P8b["Guitar tones, effects, looper mapped"]:::todo
-    P8 --> P8c["Mode switching deliberate, not accidental"]:::todo
+    P3 --> G3D["3.D survival requirements"]:::riskhigh
+    G3D --> H38["3.13 ▲ Restore Live mode in finally —<br/>on exit, exception AND signal"]:::riskhigh
+    G3D --> H39["3.14 ▲ Survives unplug/replug with no restart"]:::riskhigh
+    G3D --> H40["3.15 ○ Re-runs full init on every reconnect"]:::todo
+    G3D --> H41["3.16 ○ One batched SysEx per frame, not per-pad"]:::todo
+end
 
-    %% ---------------------------------------------------------------- PHASE 9
-    ROOT --> P9["Phase 9 · Hardening"]:::todo
-    P9 --> P9a["Full rehearsal test passed"]:::todo
-    P9 --> P9b["Launchpad unplugged mid-show, recovers"]:::todo
-    P9 --> P9c["Controller killed, Launchpad returns to Live mode"]:::todo
-    P9 --> P9d["Focusrite unplugged, warns without thrashing"]:::todo
-    P9 --> P9e["Ableton killed, recovers once then errors cleanly"]:::todo
-    P9 --> P9f["4+ hour continuous run"]:::todo
-    P9 --> P9g["Emergency clean set from cold rig"]:::todo
-    P9 --> P9h["Backup DI/pedal physically in the gig bag"]:::todo
-    P9 --> P9i["Windows system image captured"]:::todo
+%% ══════════════════════════════════════════════════════════ PHASE 4
+subgraph S4["PHASE 4 — SET BROWSER · Risk LOW"]
+    direction LR
+    P4(["PHASE 4<br/>pick a set with no screen"]):::todo
+    P4 --> J41["4.1 ○ scanner.py · find .als, skip backup/autosave"]:::todo
+    P4 --> J42["4.2 ○ models.py · LiveSet dataclass"]:::todo
+    P4 --> J43["4.3 ○ metadata.py · sets.yaml over scan results"]:::todo
+    P4 --> J44["4.4 ○ pagination.py · works past 48 sets"]:::todo
+    P4 --> J45["4.5 ○ service.py · rescan without restart"]:::todo
+    P4 --> J46["4.6 ○ Empty folder = error state, not a crash"]:::todo
+end
 
-    %% ---------------------------------------------------------------- DEPS
-    P0 -.->|"exit test gates"| P1
-    P1 -.->|"verified constants"| P3
-    P2 -.->|"spine"| P3
-    P3 -.-> P4
-    P4 -.-> P5
-    P5 -.-> P6
-    P6 -.->|"SSH exists before going blind"| P7
-    P7 -.-> P8
-    P8 -.-> P9
+%% ══════════════════════════════════════════════════════════ PHASE 5
+subgraph S5["PHASE 5 — ABLETON LAUNCHER · Risk HIGH · readiness is a guess"]
+    direction LR
+    P5(["PHASE 5<br/>launch, supervise, recover"]):::riskhigh
+    P5 --> K51["5.1 ○ launcher.py · start, stop, restart"]:::todo
+    P5 --> K52["5.2 ○ process.py · psutil supervision"]:::todo
+    P5 --> K53["5.3 ○ readiness.py · running vs actually loaded"]:::todo
+    P5 --> K54["5.4 ○ recovery.py · capped attempts, no infinite loop"]:::todo
+    P5 --> K55["5.5 ○ Refuses to launch without Focusrite or .als"]:::todo
+    P5 --> K56["5.6 ○ Hold-to-confirm 2s gates every set load"]:::todo
+    P5 --> K57["5.7 ○ Graceful close attempted before kill"]:::todo
+    P5 --> K58["5.8 ✗ KNOWN DEBT: readiness is a timing guess<br/>until a Live Remote Script sends READY"]:::unverified
+end
 
-    classDef root fill:#1f2937,stroke:#f9fafb,stroke-width:2px,color:#f9fafb,font-weight:bold
-    classDef done fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#d1fae5
-    classDef partial fill:#78350f,stroke:#fbbf24,stroke-width:2px,color:#fef3c7
-    classDef todo fill:#1e293b,stroke:#64748b,stroke-width:1px,color:#cbd5e1
-    classDef verified fill:#0c4a6e,stroke:#38bdf8,stroke-width:2px,color:#e0f2fe
-    classDef unverified fill:#4c0519,stroke:#fb7185,stroke-width:2px,color:#ffe4e6
-    classDef decision fill:#3b0764,stroke:#c084fc,stroke-width:3px,color:#f3e8ff,font-weight:bold
-    classDef branch fill:#2e1065,stroke:#a78bfa,stroke-width:1px,color:#ede9fe
-    classDef riskhigh fill:#450a0a,stroke:#ef4444,stroke-width:3px,color:#fee2e2,font-weight:bold
+%% ══════════════════════════════════════════════════════════ PHASE 6
+subgraph S6["PHASE 6 — LIFELINE · Risk MEDIUM · build this BEFORE going headless"]
+    direction LR
+    P6(["PHASE 6<br/>the recovery path for a rig with no screen"]):::todo
+    P6 --> L61["6.1 ○ ssh.py · OpenSSH, key auth only, passwords off"]:::todo
+    P6 --> L62["6.2 ○ hotspot.py · start/stop from a pad"]:::todo
+    P6 --> L63["6.3 ○ power.py · reboot 4s hold, shutdown 6s two-pad"]:::todo
+    P6 --> L64["6.4 ○ commands.py · rig-status, ableton-restart, collect-logs"]:::todo
+    P6 --> L65["6.5 ○ iPhone joins hotspot with no internet present"]:::todo
+    P6 --> L66["6.6 ✗ Does the Beelink adapter support hosted hotspot?"]:::unverified
+end
+
+%% ══════════════════════════════════════════════════════════ PHASE 7
+subgraph S7["PHASE 7 — HEADLESS BOOT · Risk MEDIUM · USB enumeration + login timing"]
+    direction LR
+    P7(["PHASE 7<br/>no monitor, no keyboard, no mouse"]):::todo
+    P7 --> N71["7.1 ○ Task Scheduler at logon, restart on failure"]:::todo
+    P7 --> N72["7.2 ○ Power plan: no sleep, hibernate, USB suspend"]:::todo
+    P7 --> N73["7.3 ○ Notifications + update reboots disabled"]:::todo
+    P7 --> N74["7.4 ○ Cold boot WITH monitor reaches Set Browser"]:::todo
+    P7 --> N75["7.5 ○ Cold boot with NO peripherals, same result"]:::todo
+    P7 --> N76["7.6 ○ Full boot completes under 90 seconds"]:::todo
+end
+
+%% ══════════════════════════════════════════════════════════ PHASE 8
+subgraph S8["PHASE 8 — PERFORMANCE LAYER · Risk HIGH · the deferred decision lands here"]
+    direction LR
+    P8(["PHASE 8<br/>performance pads must reach Ableton"]):::riskhigh
+
+    P8 --> Q8{"8.1 ◆ DECIDE<br/>who owns the Launchpad MIDI input?<br/>a Windows MIDI in port is exclusive"}:::decision
+
+    Q8 --> OA["OPTION A — Python owns the port"]:::branch
+    OA --> OA1["A.1 Ableton cannot see the Launchpad"]:::branch
+    OA --> OA2["A.2 Performance pads forwarded via virtual MIDI"]:::branch
+    OA --> OA3["A.3 One language, one process, no licence cost"]:::branch
+    OA --> OA4["A.4 LED animation on a Python thread<br/>viable — batch SysEx verified"]:::branch
+
+    Q8 --> OB["OPTION B — Bome MT Pro owns the port"]:::branch
+    OB --> OB1["B.1 Bome fans out: system → Python,<br/>performance → Ableton"]:::branch
+    OB --> OB2["B.2 Native timers + port-plugged triggers"]:::branch
+    OB --> OB3["B.3 ~79 EUR, second always-on process"]:::branch
+    OB --> OB4["B.4 Python never touches MIDI"]:::branch
+
+    P8 --> R81["8.2 ○ Panic mute works from any mode"]:::todo
+    P8 --> R82["8.3 ○ Guitar tones, effects, looper mapped"]:::todo
+    P8 --> R83["8.4 ○ Mode switching deliberate, not accidental"]:::todo
+    P8 --> R84["8.5 ○ Decision written down, with the reasoning"]:::todo
+end
+
+%% ══════════════════════════════════════════════════════════ PHASE 9
+subgraph S9["PHASE 9 — HARDENING · failure injection before a real gig"]
+    direction LR
+    P9(["PHASE 9<br/>break it on purpose, indoors"]):::todo
+    P9 --> V91["9.1 ○ Full rehearsal test passed"]:::todo
+    P9 --> V92["9.2 ○ Launchpad unplugged mid-show → recovers"]:::todo
+    P9 --> V93["9.3 ○ Controller killed → Launchpad returns to Live mode"]:::todo
+    P9 --> V94["9.4 ○ Focusrite unplugged → warns, no thrash"]:::todo
+    P9 --> V95["9.5 ○ Ableton killed → one recovery, then clean error"]:::todo
+    P9 --> V96["9.6 ○ Ran continuously for 4+ hours"]:::todo
+    P9 --> V97["9.7 ○ Emergency clean set loads from a cold rig"]:::todo
+    P9 --> V98["9.8 ○ Backup DI/pedal physically in the gig bag"]:::todo
+    P9 --> V99["9.9 ○ Full Windows system image captured"]:::todo
+end
+
+%% ══════════════════════════════════════════════════════════ ORDER
+P0 ==> P1
+P1 ==> P2
+P2 ==> P3
+P3 ==> P4
+P4 ==> P5
+P5 ==> P6
+P6 ==> P7
+P7 ==> P8
+P8 ==> P9
+
+classDef done fill:#052e1b,stroke:#22c55e,stroke-width:1.5px,color:#bbf7d0
+classDef partial fill:#3a2205,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+classDef todo fill:#18181b,stroke:#3f3f46,stroke-width:1px,color:#a1a1aa
+classDef verified fill:#082f49,stroke:#0ea5e9,stroke-width:1.5px,color:#bae6fd
+classDef unverified fill:#3b0a12,stroke:#f43f5e,stroke-width:1.5px,color:#fecdd3
+classDef decision fill:#2e1065,stroke:#a855f7,stroke-width:2px,color:#e9d5ff
+classDef branch fill:#1e1b4b,stroke:#818cf8,stroke-width:1px,color:#c7d2fe
+classDef riskhigh fill:#450a0a,stroke:#ef4444,stroke-width:2px,color:#fecaca

@@ -1,63 +1,104 @@
 %% MASTER TREE — the truth.
-%% Only what actually exists on disk or has been physically proven.
-%% RULE: a node moves to :::done only when its exit test passes. No optimism.
-%% Last reconciled: 2026-08-07
+%% Only what exists on disk or has been physically proven. No optimism.
+%% RULE: a node becomes :::done only when the roadmap's exit test for it passes.
+%%       Code existing on disk is NOT an exit test. The Phase 1 tools are written
+%%       and they are still :::partial, because none has met a Launchpad.
+%% Last reconciled: 2026-08-07 (tools/ written)
 
-flowchart LR
-    ROOT["ablepad · REAL STATE<br/>2026-08-07 · 0 lines of application code"]:::root
+flowchart TB
 
-    ROOT --> C["COMPLETE"]:::done
-    C --> C1["docs/ROADMAP.md · build order, authoritative"]:::done
-    C --> C2["docs/launchpad-x-sysex.md · extracted facts"]:::done
-    C --> C3["docs/datasheets/<br/>novation-launchpad-x-programmers-reference.pdf<br/>29pp · sha256 eca18425...97db7a"]:::done
-    C --> C4["docs/colour-palette-candidate.json<br/>candidate only, from a DIFFERENT device"]:::partial
-    C --> C5["docs/bome-mt-pro-reference.md · evaluation"]:::done
-    C --> C6["CLAUDE.md · working rules"]:::done
+%% ══════════════════════════════════════════════════════════ SECTION A
+subgraph MA["A — SHIPPED · files that exist in this repo right now"]
+    direction LR
+    A(["A · COMPLETE<br/>documentation only · 0 lines of rig code"]):::done
+    A --> A1["A.1 ✓ docs/ROADMAP.md<br/>build order · authoritative"]:::done
+    A --> A2["A.2 ✓ docs/launchpad-x-sysex.md<br/>facts extracted from the manual"]:::done
+    A --> A3["A.3 ✓ docs/datasheets/…programmers-reference.pdf<br/>29pp · sha256 eca18425…97db7a"]:::done
+    A --> A4["A.4 ✓ docs/bome-mt-pro-reference.md<br/>Option B evaluation"]:::done
+    A --> A5["A.5 ✓ CLAUDE.md · working rules"]:::done
+    A --> A6["A.6 ◐ docs/colour-palette-candidate.json<br/>CANDIDATE ONLY — sourced from a different device"]:::partial
+    A --> A7["A.7 ✓ viz/ · this tree viewer"]:::done
+    A --> A8["A.8 ◐ tools/ · 6 scripts, Phase 1 bench instruments<br/>WRITTEN, NEVER RUN ON HARDWARE"]:::partial
+end
 
-    C --> CV["Facts verified against the manual"]:::verified
-    CV --> CV1["Programmer Mode SysEx bytes · p.7"]:::verified
-    CV --> CV2["Two MIDI ports on Windows · p.6"]:::verified
-    CV --> CV3["Release = note-on velocity 0 · p.6"]:::verified
-    CV --> CV4["Batch LED write, 81 pads/msg · p.15"]:::verified
-    CV --> CV5["Grid corners 11 / 81 / 18 · p.14"]:::verified
+%% ══════════════════════════════════════════════════════════ SECTION B
+subgraph MB["B — VERIFIED HARDWARE FACTS · cited, safe to build on"]
+    direction LR
+    B(["B · 4 of 9 assumptions closed<br/>all from the Programmer's Reference, 2026-08-07"]):::verified
+    B --> B1["B.1 ✓ Programmer Mode SysEx bytes · p.7"]:::verified
+    B --> B2["B.2 ✓ Two MIDI ports on Windows · p.6"]:::verified
+    B --> B3["B.3 ✓ Release = note-on velocity 0 · p.6"]:::verified
+    B --> B4["B.4 ✓ Batch LED write, 81 pads/msg · p.15"]:::verified
+    B --> B5["B.5 ✓ Grid corners 11 / 81 / 18 · p.14"]:::verified
+end
 
-    ROOT --> PA["PARTIAL"]:::partial
-    PA --> PA1["Phase 0 · one checkbox of ten<br/>reference guide downloaded"]:::partial
-    PA --> PA2["Phase 1 · 3 of 9 assumptions closed"]:::partial
-    PA --> PA3["Grid interior notes 12-87 · inferred, not measured"]:::partial
+%% ══════════════════════════════════════════════════════════ SECTION C
+subgraph MC["C — PARTIAL · started, not proven, do not lean on it"]
+    direction LR
+    C(["C · IN FLIGHT"]):::partial
+    C --> C1["C.1 ◐ Phase 0 — 1 of 10 done, 1 partial<br/>repo + .gitignore + requirements.txt exist,<br/>venv still owed on the Beelink"]:::partial
+    C --> C2["C.2 ◐ Phase 1 — 4 of 9 assumptions closed<br/>writing the tools closed none of them"]:::partial
+    C --> C3["C.3 ◐ Grid interior notes 12-87<br/>inferred from corners, never measured"]:::partial
+    C --> C4["C.4 ◐ tools/ verified only as far as a Mac allows<br/>25 pure-logic assertions, pyflakes clean,<br/>SysEx checked vs the manual's worked examples"]:::partial
+    C --> C5["C.5 ◐ _bench.py restore contract<br/>covers exit / exception / Ctrl+C / SIGTERM,<br/>NEVER EXERCISED against a real device"]:::partial
+end
 
-    ROOT --> NS["NOT STARTED"]:::todo
-    NS --> NS1["rig/ · state machine, controller, events"]:::todo
-    NS --> NS2["launchpad/ · device, renderer, modes"]:::todo
-    NS --> NS3["set_browser/"]:::todo
-    NS --> NS4["ableton/"]:::todo
-    NS --> NS5["windows/ · hotspot, ssh, power"]:::todo
-    NS --> NS6["storage/ · config, runtime state"]:::todo
-    NS --> NS7["tests/"]:::todo
-    NS --> NS8["config/rig.yaml"]:::todo
-    NS --> NS9["tools/ · exists, empty"]:::todo
-    NS --> NS10["Every Windows configuration step"]:::todo
-    NS --> NS11["Every hardware verification on real metal"]:::todo
+%% ══════════════════════════════════════════════════════════ SECTION D
+subgraph MD["D — NOT STARTED · every module, every Windows step"]
+    direction LR
+    D(["D · ZERO CODE"]):::todo
+    D --> D1["D.1 ○ rig/ · state, controller, events, commands"]:::todo
+    D --> D2["D.2 ○ launchpad/ · device, renderer, modes"]:::todo
+    D --> D3["D.3 ○ set_browser/"]:::todo
+    D --> D4["D.4 ○ ableton/"]:::todo
+    D --> D5["D.5 ○ windows/ · hotspot, ssh, power"]:::todo
+    D --> D6["D.6 ○ storage/ · config, runtime state"]:::todo
+    D --> D7["D.7 ○ tests/"]:::todo
+    D --> D8["D.8 ○ config/rig.yaml"]:::todo
+    D --> D9["D.9 ○ tools/results/ · empty, no findings recorded yet"]:::todo
+    D --> D10["D.10 ○ Every Windows configuration step"]:::todo
+    D --> D11["D.11 ○ Every hardware verification on real metal"]:::todo
+end
 
-    ROOT --> BL["BLOCKERS + OPEN UNKNOWNS"]:::unverified
-    BL --> BL1["Start_DOCS 4073 lines NOT IN REPO<br/>every section-n citation is uncheckable"]:::riskhigh
-    BL --> BL2["Full 9x9 note + CC map · page image, unread"]:::unverified
-    BL --> BL3["Colour palette 0-127 · 8 indices known"]:::unverified
-    BL --> BL4["Beelink hosted hotspot support"]:::unverified
-    BL --> BL5["Ableton exe path"]:::unverified
-    BL --> BL6["MIDI input exclusivity · deferred to Phase 8"]:::decision
-    BL --> BL7["No hardware reachable from macOS dev box"]:::unverified
+%% ══════════════════════════════════════════════════════════ SECTION E
+subgraph ME["E — BLOCKERS AND OPEN UNKNOWNS · what can still break the plan"]
+    direction LR
+    E(["E · RISK REGISTER"]):::unverified
+    E --> E1["E.1 ▲ Start_DOCS 4,073 lines NOT IN REPO<br/>every §n citation is currently uncheckable"]:::riskhigh
+    E --> E2["E.2 ▲ Programmer mode disables the Setup menu<br/>a crashed controller strands a headless rig"]:::riskhigh
+    E --> E3["E.3 ✗ Full 9×9 note + CC map · page image, unread"]:::unverified
+    E --> E4["E.4 ✗ Colour palette 0-127 · 8 indices known"]:::unverified
+    E --> E5["E.5 ✗ Beelink hosted-hotspot support"]:::unverified
+    E --> E6["E.6 ✗ Ableton exe path"]:::unverified
+    E --> E7["E.7 ✗ No hardware reachable from the macOS dev box"]:::unverified
+    E --> E8["E.8 ◆ MIDI input exclusivity — deferred to Phase 8<br/>deliberate, not forgotten"]:::decision
+end
 
-    ROOT --> NX["NEXT SINGLE HIGHEST-VALUE TASK"]:::next
-    NX --> NX1["Finish Phase 0 bench truth.<br/>Guitar to Scarlett to Ableton to mixer,<br/>30 min, no dropouts."]:::next
-    NX1 --> NX2["THEN Phase 1: write tools/midi_port_inspector.py<br/>on the Beelink and record real port strings."]:::next
+%% ══════════════════════════════════════════════════════════ SECTION F
+subgraph MF["F — NEXT · the single highest-value action, in order"]
+    direction LR
+    F(["F · DO THIS NEXT<br/>the tools are written — everything below runs ON THE BEELINK"]):::next
+    F --> F1["STEP 1 → Finish Phase 0 bench truth.<br/>Guitar → Scarlett → Ableton → mixer,<br/>30 minutes, zero dropouts."]:::next
+    F1 --> F2["STEP 2 → Record the Ableton exe path<br/>and the chosen buffer / sample rate."]:::next
+    F2 --> F3["STEP 3 → Prove the restore contract FIRST.<br/>Run any tool, kill it with Ctrl+C,<br/>confirm hold-Session still opens Setup.<br/>This is the High risk — test it before trusting it."]:::next
+    F3 --> F4["STEP 4 → midi_port_inspector.py twice:<br/>--label ableton-closed, then --label ableton-open.<br/>The diff IS the exclusivity constraint."]:::next
+    F4 --> F5["STEP 5 → note_tester --frame · ~2 min.<br/>The CC frame is the actual unknown;<br/>do it before the 81-position sweep."]:::next
+    F5 --> F6["STEP 6 → Full sweep + led_batch_tester.<br/>Commit grid.py with measured values,<br/>and replace the settle-time guess."]:::next
+    F6 --> F7["STEP 7 → Colour sweep. Photograph both pages,<br/>commit the photos next to colors.py."]:::next
+    F7 --> F8["STEP 8 → Exit test 1 passes → only then Phase 2."]:::next
+end
 
-    classDef root fill:#1f2937,stroke:#f9fafb,stroke-width:2px,color:#f9fafb,font-weight:bold
-    classDef done fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#d1fae5
-    classDef partial fill:#78350f,stroke:#fbbf24,stroke-width:2px,color:#fef3c7
-    classDef todo fill:#1e293b,stroke:#64748b,stroke-width:1px,color:#cbd5e1
-    classDef verified fill:#0c4a6e,stroke:#38bdf8,stroke-width:2px,color:#e0f2fe
-    classDef unverified fill:#4c0519,stroke:#fb7185,stroke-width:2px,color:#ffe4e6
-    classDef decision fill:#3b0764,stroke:#c084fc,stroke-width:3px,color:#f3e8ff,font-weight:bold
-    classDef riskhigh fill:#450a0a,stroke:#ef4444,stroke-width:3px,color:#fee2e2,font-weight:bold
-    classDef next fill:#365314,stroke:#a3e635,stroke-width:3px,color:#ecfccb,font-weight:bold
+A ==> B
+B ==> C
+C ==> D
+D ==> E
+E ==> F
+
+classDef done fill:#052e1b,stroke:#22c55e,stroke-width:1.5px,color:#bbf7d0
+classDef partial fill:#3a2205,stroke:#f59e0b,stroke-width:1.5px,color:#fde68a
+classDef todo fill:#18181b,stroke:#3f3f46,stroke-width:1px,color:#a1a1aa
+classDef verified fill:#082f49,stroke:#0ea5e9,stroke-width:1.5px,color:#bae6fd
+classDef unverified fill:#3b0a12,stroke:#f43f5e,stroke-width:1.5px,color:#fecdd3
+classDef decision fill:#2e1065,stroke:#a855f7,stroke-width:2px,color:#e9d5ff
+classDef riskhigh fill:#450a0a,stroke:#ef4444,stroke-width:2px,color:#fecaca
+classDef next fill:#052e16,stroke:#84cc16,stroke-width:2px,color:#d9f99d

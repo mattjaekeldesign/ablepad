@@ -2,6 +2,7 @@
 node_modules/
 dist-viz/
 .vite/
+.ablepad/
 
 # --- python rig (Phase 2 onward) ---
 __pycache__/

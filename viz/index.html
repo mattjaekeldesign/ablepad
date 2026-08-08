@@ -3,61 +3,143 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ablepad — Master Tree</title>
+    <title>ablepad — architecture trees</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <header class="bar">
+    <!-- ─────────────────────────────────────────────────────────── header -->
+    <header class="header">
       <div class="brand">
-        <span class="dot"></span>
-        <strong>ablepad</strong>
-        <span class="sub">rig architecture trees</span>
+        <span class="logo">ap</span>
+        <div class="brand-text">
+          <strong>ablepad</strong>
+          <span class="muted">Beelink headless Ableton rig</span>
+        </div>
       </div>
 
-      <div class="views" role="group" aria-label="View mode">
-        <button data-view="split" class="active">Side by side</button>
-        <button data-view="projected">Projected only</button>
-        <button data-view="master">Master only</button>
+      <div class="tabs" role="tablist" aria-label="View mode">
+        <button role="tab" data-view="split" class="tab active">Compare</button>
+        <button role="tab" data-view="projected" class="tab">Plan</button>
+        <button role="tab" data-view="master" class="tab">Truth</button>
       </div>
 
-      <div class="tools">
-        <button id="fit" title="Fit both panes to content">Fit</button>
-        <button id="reset" title="Reset zoom to 100%">100%</button>
-        <button id="legend-toggle" title="Show / hide the colour legend">Legend</button>
+      <div class="actions">
+        <div class="tabs small" role="group" aria-label="Layout">
+          <button data-layout="tall" class="tab active" title="Sections stack vertically — readable (L)">Tall</button>
+          <button data-layout="wide" class="tab" title="Sections run horizontally — overview (L)">Wide</button>
+        </div>
+        <button id="fit" class="btn ghost" title="Fit whole tree to pane (F)">Fit</button>
+        <button id="sidebar-toggle" class="btn ghost" title="Toggle sidebar (S)">Sidebar</button>
       </div>
     </header>
 
-    <section id="legend" class="legend">
-      <span class="key k-done">Done — exit test passed</span>
-      <span class="key k-partial">Partial — started, not proven</span>
-      <span class="key k-todo">Not started</span>
-      <span class="key k-verified">Verified against hardware/manual</span>
-      <span class="key k-unverified">UNVERIFIED — guess, load-bearing</span>
-      <span class="key k-decision">Deferred decision / branch point</span>
-      <span class="key k-riskhigh">High risk</span>
-      <span class="key k-next">Next action</span>
-      <span class="hint">scroll = zoom · drag = pan · edit <code>viz/trees/*.mmd</code> and save</span>
-    </section>
+    <div class="shell">
+      <!-- ───────────────────────────────────────────────────────── sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <section class="card">
+          <div class="card-head">
+            <h3>How to read this</h3>
+          </div>
+          <ol class="steps">
+            <li><span class="step-n">1</span> Pick a view: <b>Plan</b>, <b>Truth</b>, or <b>Compare</b>.</li>
+            <li><span class="step-n">2</span> Click a section below to zoom straight to it.</li>
+            <li><span class="step-n">3</span> Walk sections in order with the arrows at the bottom.</li>
+            <li><span class="step-n">4</span> Too small? <b>+</b> / <b>−</b> in the pane header, or double-click any box.</li>
+            <li><span class="step-n">5</span> Edit <code>viz/trees/*.mmd</code>; the page reloads on save.</li>
+          </ol>
+        </section>
 
-    <main id="stage" class="stage view-split">
-      <section class="pane" data-pane="projected">
-        <h2 class="pane-title">
-          <span class="tag tag-projected">PROJECTED</span>
-          the plan — every branch, including undecided ones
-        </h2>
-        <div class="viewport"><div class="canvas" id="canvas-projected"></div></div>
-      </section>
+        <section class="card grow">
+          <div class="card-head">
+            <h3>Sections</h3>
+            <span class="muted tiny" id="section-count"></span>
+          </div>
+          <nav class="section-list" id="section-list"></nav>
+        </section>
 
-      <div class="divider" aria-hidden="true"></div>
+        <section class="card">
+          <div class="card-head"><h3>Status legend</h3></div>
+          <div class="legend">
+            <span class="badge b-done">✓ done — exit test passed</span>
+            <span class="badge b-partial">◐ partial — not proven</span>
+            <span class="badge b-todo">○ not started</span>
+            <span class="badge b-verified">✓ verified — cited fact</span>
+            <span class="badge b-unverified">✗ unverified — load-bearing guess</span>
+            <span class="badge b-decision">◆ deferred decision</span>
+            <span class="badge b-riskhigh">▲ high risk</span>
+            <span class="badge b-next">→ next action</span>
+          </div>
+        </section>
 
-      <section class="pane" data-pane="master">
-        <h2 class="pane-title">
-          <span class="tag tag-master">MASTER</span>
-          the truth — what actually exists on disk
-        </h2>
-        <div class="viewport"><div class="canvas" id="canvas-master"></div></div>
-      </section>
-    </main>
+        <section class="card">
+          <div class="card-head"><h3>Shortcuts</h3></div>
+          <div class="keys">
+            <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><span>view</span></div>
+            <div><kbd>J</kbd><kbd>K</kbd><span>next / prev section</span></div>
+            <div><kbd>+</kbd><kbd>−</kbd><span>zoom</span></div>
+            <div><kbd>F</kbd><span>fit whole tree</span></div>
+            <div><kbd>0</kbd><span>reset to 100%</span></div>
+            <div><kbd>L</kbd><span>tall / wide layout</span></div>
+            <div><kbd>S</kbd><span>sidebar</span></div>
+          </div>
+        </section>
+      </aside>
+
+      <!-- ──────────────────────────────────────────────────────── panes -->
+      <main id="stage" class="stage view-split">
+        <section class="pane card" data-pane="projected">
+          <div class="pane-head">
+            <div class="pane-title">
+              <span class="badge b-plan">PLAN</span>
+              <div>
+                <strong>Projected tree</strong>
+                <p class="muted tiny">Every phase, step and undecided branch. What we intend to build.</p>
+              </div>
+            </div>
+            <div class="head-right">
+              <div class="zoom" data-zoom="projected">
+                <button class="zbtn" data-zdir="out">−</button>
+                <span class="zlabel">100%</span>
+                <button class="zbtn" data-zdir="in">+</button>
+              </div>
+              <div class="chips" data-chips="projected"></div>
+            </div>
+          </div>
+          <div class="viewport"><div class="canvas" id="canvas-projected"></div></div>
+        </section>
+
+        <section class="pane card" data-pane="master">
+          <div class="pane-head">
+            <div class="pane-title">
+              <span class="badge b-truth">TRUTH</span>
+              <div>
+                <strong>Master tree</strong>
+                <p class="muted tiny">Only what exists on disk or has been physically proven.</p>
+              </div>
+            </div>
+            <div class="head-right">
+              <div class="zoom" data-zoom="master">
+                <button class="zbtn" data-zdir="out">−</button>
+                <span class="zlabel">100%</span>
+                <button class="zbtn" data-zdir="in">+</button>
+              </div>
+              <div class="chips" data-chips="master"></div>
+            </div>
+          </div>
+          <div class="viewport"><div class="canvas" id="canvas-master"></div></div>
+        </section>
+      </main>
+    </div>
+
+    <!-- ─────────────────────────────────────────────────────────── footer -->
+    <footer class="footer">
+      <div class="stepper">
+        <button id="prev" class="btn" title="Previous section (K)">←</button>
+        <span id="step-label" class="step-label">no section selected</span>
+        <button id="next" class="btn" title="Next section (J)">→</button>
+      </div>
+      <span class="muted tiny">scroll = zoom · drag = pan · content lives in <code>viz/trees/*.mmd</code></span>
+    </footer>
 
     <script type="module" src="./main.js"></script>
   </body>

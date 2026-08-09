@@ -266,9 +266,13 @@ stage. Test it 20 times, not twice.
 > from the real Lab engine (`tools/dump_golden_frames.mjs`, `tests/test_animations_golden.py`).
 > `launchpad/player.py` covers the two animation checkboxes' LOGIC: pull-model frame(now)
 > per tick (non-blocking by construction), cancel mid-run, any-press intro skip, 15 s
-> failsafe. What remains hardware: everything touching a port, and the renderer that
-> composites player frames under/over a mode screen. Regenerate goldens after any edit
-> to the Lab engine.
+> failsafe. `launchpad/mappings.py` ports the Config Lab contract (viz/lab/schema.js):
+> the committed configs/ and animations/ load into typed ModeConfig objects — shape
+> errors hard-fail listing every file, dangling refs warn and load, hold_ms defaults
+> (2 s load / 4 s reboot / 6 s shutdown) fill from the catalogue. What remains hardware:
+> everything touching a port, and the renderer that composites player frames under/over
+> a mode screen. Regenerate goldens after any edit to the Lab engine; port any schema.js
+> change into mappings.py — the pairing is pinned by schemaVersion.
 
 ---
 

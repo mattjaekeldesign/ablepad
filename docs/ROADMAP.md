@@ -261,6 +261,12 @@ launchpad/
 **Risk: Medium.** The reconnect + SysEx path is the single most common way this rig dies on
 stage. Test it 20 times, not twice.
 
+> Off-rig head start, 2026-08-09: `launchpad/animations.py` — the pure frame engine — is
+> ported from `viz/lab/anim.js` and verified bit-for-bit against 240 golden frames dumped
+> from the real Lab engine (`tools/dump_golden_frames.mjs`, `tests/test_animations_golden.py`).
+> The PLAYER (non-blocking, killable, tick-driven) remains Phase 3 work, as does everything
+> touching a port. Regenerate goldens after any edit to the Lab engine.
+
 ---
 
 ## Phase 4 — Set browser
@@ -275,15 +281,18 @@ set_browser/
 ```
 
 ```text
-□ Finds .als files, ignores backup/autosave/project-info
-□ sets.yaml metadata (name, colour, category) overrides defaults
-□ Unknown files still appear, in a neutral colour
-□ Pagination works past 48 sets
-□ Empty folder shows an error state, does not crash
-□ Rescan works without restarting the controller
+■ Finds .als files, ignores backup/autosave/project-info         ← DONE 2026-08-09
+■ sets.yaml metadata (name, colour, category) overrides defaults ← DONE 2026-08-09 (colour stays a NAME — palette indices are Phase 1 truth)
+■ Unknown files still appear, in a neutral colour                ← DONE 2026-08-09
+■ Pagination works past 48 sets                                  ← DONE 2026-08-09 (48/page is an UNVERIFIED design constant pending Start_DOCS)
+■ Empty folder shows an error state, does not crash              ← LOGIC DONE 2026-08-09 (`is_empty` exposed; the Error Mode *display* is Phase 3)
+■ Rescan works without restarting the controller                 ← DONE 2026-08-09 (same service object; preserves page, clamps when sets vanish)
 ```
 
 **Risk: Low.**
+
+> Built off-rig 2026-08-09, out of phase order because Phase 3 is hardware-blocked. The
+> controller wiring (pads → page turns → selection) is Phase 3 work and remains open.
 
 ---
 

@@ -20,6 +20,7 @@ tools/
 ├── led_color_tester.py           the 128-colour palette
 ├── led_batch_tester.py           81-entry SysEx: accepted? how fast?
 ├── interface_name_inspector.py   Get-PnpDevice → EVO 8 names
+├── dump_golden_frames.mjs        node: Lab engine → tests/golden/ (animation parity)
 └── results/                      dated findings. Committed — they are the evidence
 ```
 

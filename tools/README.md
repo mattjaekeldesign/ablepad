@@ -13,12 +13,13 @@ to start.
 
 ```text
 tools/
+├── rig_survey.py                 one-shot read-only machine survey — RUN THIS FIRST
 ├── _bench.py                     shared: SysEx vocabulary, ports, session lifecycle
 ├── midi_port_inspector.py        port names + open-ability probe
 ├── launchpad_note_tester.py      the 9x9 map
 ├── led_color_tester.py           the 128-colour palette
 ├── led_batch_tester.py           81-entry SysEx: accepted? how fast?
-├── interface_name_inspector.py   Get-PnpDevice → Scarlett names
+├── interface_name_inspector.py   Get-PnpDevice → EVO 8 names
 └── results/                      dated findings. Committed — they are the evidence
 ```
 
@@ -44,12 +45,13 @@ Each step depends on the one above it.
 
 | # | Tool | Produces | Notes |
 |---|---|---|---|
+| 0 | `rig_survey.py` | first-pass values for Phases 0/1/4/6/7 | **Stdlib-only, read-only, zero interaction.** Runs before the venv exists. Never touches the Launchpad, so no restore contract. MIDI names via WinMM (truncated to 31 chars — same truncation rtmidi sees). Everything it finds is presence, not health |
 | 1 | `midi_port_inspector.py` | `launchpad/ports.py` names | Run twice: `--label ableton-closed`, then `--label ableton-open`, and diff. A port that reads OK in one and HELD in the other is MIDI input exclusivity made visible |
 | 2 | `launchpad_note_tester.py --frame` | the CC frame | ~2 min, and it is the actual unknown. Do this before the full sweep |
 | 3 | `launchpad_note_tester.py` | `launchpad/grid.py` | Full 81-position guided sweep |
 | 4 | `led_batch_tester.py` | `renderer.py` design | Also measures the real Programmer-Mode settle time, replacing the guess in `_bench.py` |
 | 5 | `led_color_tester.py` | `launchpad/colors.py` | Photograph both pages. **Commit the photographs** — a palette reading nobody can re-check is barely better than a guess |
-| 6 | `interface_name_inspector.py` | `config/rig.yaml` | Once per Scarlett. `--label` keeps them apart |
+| 6 | `interface_name_inspector.py` | `config/rig.yaml` | Records every EVO 8 endpoint. `--label` keeps runs apart |
 
 ## How the note tester works, and why
 

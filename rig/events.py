@@ -59,6 +59,27 @@ class Tick(Event):
     count: int
 
 
+@dataclass(frozen=True)
+class AbletonCrashed(Event):
+    """The Live process vanished without being asked to. Supervisor decides next."""
+
+    set_name: str
+
+
+@dataclass(frozen=True)
+class AbletonRestarted(Event):
+    """The supervisor spent a budget attempt and relaunched the same set."""
+
+    set_name: str
+
+
+@dataclass(frozen=True)
+class AbletonGaveUp(Event):
+    """Budget exhausted or restart refused. The controller must enter Error Mode."""
+
+    set_name: str
+
+
 E = TypeVar("E", bound=Event)
 Handler = Callable[[Event], None]
 

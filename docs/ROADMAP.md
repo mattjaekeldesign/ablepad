@@ -264,8 +264,11 @@ stage. Test it 20 times, not twice.
 > Off-rig head start, 2026-08-09: `launchpad/animations.py` — the pure frame engine — is
 > ported from `viz/lab/anim.js` and verified bit-for-bit against 240 golden frames dumped
 > from the real Lab engine (`tools/dump_golden_frames.mjs`, `tests/test_animations_golden.py`).
-> The PLAYER (non-blocking, killable, tick-driven) remains Phase 3 work, as does everything
-> touching a port. Regenerate goldens after any edit to the Lab engine.
+> `launchpad/player.py` covers the two animation checkboxes' LOGIC: pull-model frame(now)
+> per tick (non-blocking by construction), cancel mid-run, any-press intro skip, 15 s
+> failsafe. What remains hardware: everything touching a port, and the renderer that
+> composites player frames under/over a mode screen. Regenerate goldens after any edit
+> to the Lab engine.
 
 ---
 
@@ -307,14 +310,17 @@ ableton/
 ```
 
 ```text
-□ Refuses to launch if the EVO 8 is absent
-□ Refuses to launch if the .als is missing
-□ Hold-to-confirm (2s) gates every set load
-□ Graceful close attempted before kill
-□ Crash detected and one restart attempted
-□ Restart attempts capped — no infinite loop
+◪ Refuses to launch if the EVO 8 is absent      ← LOGIC DONE 2026-08-09 against a fake detector; the REAL PnP detector needs Phase 1 names
+◪ Refuses to launch if the .als is missing      ← LOGIC DONE 2026-08-09 (all failing preconditions reported together)
+□ Hold-to-confirm (2s) gates every set load       (controller/mode wiring — Phase 3+)
+◪ Graceful close attempted before kill          ← LOGIC DONE 2026-08-09; Windows terminate() behaviour UNVERIFIED until bench
+◪ Crash detected and one restart attempted      ← LOGIC DONE 2026-08-09 (supervisor poll, events on the bus)
+◪ Restart attempts capped — no infinite loop    ← LOGIC DONE 2026-08-09 (budget refills only after a stable_s run)
 □ Stable/Candidate deployment folders in use, sets treated read-only
 ```
+
+◪ = policy built+tested off-rig with fakes; the psutil adapter (`ableton/process.py`)
+is the ONLY unverified seam and gets one bench session on the Beelink.
 
 **Risk: High.** "Process exists" ≠ "set loaded". Until an Ableton Remote Script sends a READY
 signal, readiness is a timing guess. Accept that for now; log it as known debt.

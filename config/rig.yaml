@@ -1,0 +1,33 @@
+# config/rig.yaml — the rig's single configuration file.
+#
+# NOT the same thing as configs/ (the Config Lab's mode-layout JSON). This file is
+# machine/deployment truth; configs/ is UI design. They merge no earlier than Phase 3.
+#
+# Values marked UNVERIFIED are placeholders awaiting tools/rig_survey.py output from
+# the Beelink. Replace them with measured values WITH their provenance headers, and
+# delete the UNVERIFIED tag as each lands. storage/config_loader.py validates shape
+# and ranges, but it cannot know a wrong path from a right one — only the survey can.
+
+rig:
+  name: liverig
+  tick_hz: 30            # matches the Lab's animation frame rate; hardware feasibility
+                         # of 30 fps SysEx streaming is UNVERIFIED (Phase 1, led_batch_tester)
+
+launchpad:
+  brightness: 40         # UNVERIFIED sane-guess. Manual p.5: low brightness may be
+                         # REQUIRED for the device to power on at all. Tune at bench.
+  port_contains: "LPX"   # UNVERIFIED — replace with verbatim substring from
+                         # tools/results/rig-survey-*.txt midi-ports section
+
+audio_interface:
+  match_any:             # UNVERIFIED — replace from interface_name_inspector.py output
+    - "EVO 8"
+  require_status: "OK"   # presence only; an ESD-wedged EVO still reads OK (manual p.10)
+
+ableton:
+  exe: "C:\\ProgramData\\Ableton\\UNVERIFIED\\Program\\Ableton Live.exe"  # from rig_survey.py
+  sets_dir: "C:\\LiveRig\\Sets"                                           # roadmap §8 tree
+
+logging:
+  dir: "logs"
+  level: "INFO"

@@ -129,8 +129,12 @@ Python fixes it.
 
 ```text
 □ Windows account "LiveRig" created, auto-login enabled
-□ Focusrite driver installed, ASIO confirmed in Ableton
-□ Guitar → Scarlett → Ableton → mixer produces sound
+□ Audient EVO 8 Windows driver installed (MANDATORY — not class-compliant on Windows)
+□ EVO firmware updated WHILE STILL ONLINE; driver + firmware versions recorded
+□ EVO Mixer tray app running; ASIO buffer + sample rate set THERE, not in Ableton
+□ Beelink USB port chosen and recorded (USB-A = 2 phantom channels, USB-C @1.5A = 4)
+□ ASIO confirmed in Ableton
+□ Guitar → EVO 8 front DI → Ableton → mixer produces sound (DI overrides channel 1)
 □ Buffer size and sample rate chosen and written down
 □ Round-trip latency measured and judged playable
 □ C:\LiveRig\ folder tree created (§8)
@@ -176,7 +180,9 @@ tools/
 ■ Release semantics confirmed (note-on vel 0)                   ← DONE, manual p.6
 ■ Batch LED write                                               ← DONE, 81 entries/msg, p.15
 □ Port list recorded — exact Windows name strings for both interfaces
-□ Focusrite friendly names recorded for every Scarlett you own
+□ EVO 8 Get-PnpDevice friendly names recorded for EVERY endpoint
+│   └── manual prints 'EVO 8 Main Output 1+2' and 'Loop-back 1+2' — confirm against PnP
+□ Decided which endpoint means 'interface present' (Loop-back is not it)
 □ Programmer→Live restore-on-crash proven (kill the process, check the Setup menu still opens)
 ```
 
@@ -210,16 +216,20 @@ tests/                state machine + config validation
 ```
 
 ```text
-□ rig.yaml loads and validates; missing sections raise clearly
-□ Logging writes to file and console
-□ State machine transitions logged, illegal transitions rejected
-□ Controller runs a no-op tick loop without crashing
-□ Ctrl+C exits cleanly
-□ Unit tests pass
+■ rig.yaml loads and validates; missing sections raise clearly   ← DONE 2026-08-09 (all problems reported at once, exit code 2)
+■ Logging writes to file and console                             ← DONE 2026-08-09
+■ State machine transitions logged, illegal transitions rejected ← DONE 2026-08-09
+■ Controller runs a no-op tick loop without crashing             ← DONE 2026-08-09 (30 Hz, overrun re-anchor, 0 overruns observed)
+■ Ctrl+C exits cleanly                                           ← DONE 2026-08-09 on macOS — RE-VERIFY on Windows console (CTRL_C_EVENT path)
+■ Unit tests pass                                                ← DONE 2026-08-09 (46 tests, incl. _bench SysEx vs manual p.14–15 examples)
 ```
 
 **Risk: Low.** Pure Python, fully testable with no hardware attached. This is the only phase that
 can be developed entirely off the Beelink.
+
+> Built off-rig 2026-08-09 while awaiting the Beelink (Phases 0–1 hardware-blocked, not
+> skipped). The state transition table in `rig/state.py` is a DESIGN DECISION authored
+> without Start_DOCS — review it when that document lands.
 
 ---
 
@@ -288,7 +298,7 @@ ableton/
 ```
 
 ```text
-□ Refuses to launch if the Focusrite is absent
+□ Refuses to launch if the EVO 8 is absent
 □ Refuses to launch if the .als is missing
 □ Hold-to-confirm (2s) gates every set load
 □ Graceful close attempted before kill
@@ -366,7 +376,9 @@ already be reliable so this can fail safely.
 □ Full rehearsal test (§51) passed
 □ Launchpad unplugged mid-show → recovers
 □ Rig Controller killed mid-show → Launchpad still returns to Live mode
-□ Focusrite unplugged mid-show → warns, does not thrash
+□ EVO 8 unplugged mid-show → warns, does not thrash
+□ EVO 8 ESD-wedged mid-show → rig says AUDIO FAULT on the Launchpad, not silence
+□ Launchpad AND EVO both replugged → both recover without restarting Live
 □ Ableton killed mid-show → recovers once, then errors cleanly
 □ Ran continuously for 4+ hours
 □ Emergency clean set loads from a cold rig

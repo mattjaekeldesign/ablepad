@@ -3,8 +3,19 @@
 Control software for a dedicated Beelink performance computer that behaves like a hardware
 guitar processor. The Launchpad is the operating system interface.
 
-**Status:** Phase 0/1. Zero lines of application code. Design is documented; hardware truth is
-mostly unverified. See `docs/ROADMAP.md` — it is the build order and it is authoritative.
+**Status:** Phases 2 and 4 built and green off-rig (374 tests); Phase 5 policy layer, the
+animation engine (golden-verified against the Lab), player, and Config Lab loader too.
+Phase 0/1 hardware truth starts now that the Beelink exists. See `docs/ROADMAP.md` — it is
+the build order and it is authoritative, and its checkboxes are the todo list.
+
+## 0. Cross-machine handoff
+
+This repo is worked on from two machines — the macOS dev machine and the Beelink itself.
+Claude Code sessions and auto-memory do NOT sync between them. A snapshot of the macOS
+instance's memory lives in `.claude/memory-export/` (exported 2026-08-11). **On a fresh
+machine: read `.claude/memory-export/MEMORY.md` and the files it indexes before doing
+anything else**, then seed your local auto-memory from them. Re-export when memory changes
+materially; the export is a snapshot, not a live mirror.
 
 ---
 
@@ -16,8 +27,9 @@ The finished rig requires **no monitor, no keyboard, no mouse, no internet**.
 Rig
 │
 ├── Beelink Mini PC (Windows)
-├── Novation Launchpad X          ← the entire user interface
-├── Focusrite Scarlett (temporary — a permanent interface replaces it later)
+├── Novation Launchpad X          ← the rig's operating-system interface
+├── Hotone Ampero II Stage        ← guitar rack + performance foot controller (added 2026-08-09)
+├── Audient EVO 8 (4in/4out USB-C — replaced the Focusrite Scarlett, 2026-08-09)
 └── Ableton Live
 ```
 
@@ -91,7 +103,7 @@ Ableton Live
    ↓
 ASIO
    ↓
-Focusrite Scarlett
+Audient EVO 8
    ↓
 Mixer
 ```
@@ -136,7 +148,7 @@ Every feature ends in a verification checklist:
 
 ```text
 □ Launchpad detected
-□ Scarlett detected
+□ EVO 8 detected (present AND producing audio — see docs/audient-evo-8-reference.md §6)
 □ Ableton launches
 □ LEDs update
 □ Hotspot starts
@@ -234,6 +246,47 @@ This repo is checked out on macOS at `/Users/matt/Documents/code/ablepad`, but t
 **Windows** at `C:\LiveRig\`. Paths, PowerShell, `psutil`, Task Scheduler and MIDI port names
 are all Windows-specific. Nothing hardware-touching can be tested from this machine — write it
 so it can be, and keep the device layer behind a thin interface.
+
+## 11. Audio interface
+
+The interface is an **Audient EVO 8** (4in/4out, USB-C), replacing the Focusrite Scarlett as of
+2026-08-09, together with Samson over-ear headphones and 2× XLR mic cables. Manual in the repo:
+`docs/datasheets/audient-evo-8-manual-v1.0.pdf`, extracted facts in `docs/audient-evo-8-reference.md`.
+
+Four things it changed that are not a rename:
+
+| | |
+|---|---|
+| **Windows needs a driver** | The EVO 8 is not class-compliant on Windows. Phase 0 gains a hard dependency, and Windows Update can break it |
+| **ASIO lives in a tray app** | Buffer size and sample rate are set in the EVO Mixer app, not Ableton. That app is a second always-on process in the boot chain |
+| **ESD now kills two devices** | The EVO 8 "may cease to output sound" after an ESD event, recoverable only by unplugging (manual p.10). The Launchpad X has the same failure. Neither is fixable in code |
+| **USB port choice is an audio decision** | USB-A gives 2 phantom channels; USB-C at 1.5 A gives 4 |
+
+The ESD one is the one to design against: an ESD-wedged EVO may still enumerate, so *presence
+is not health*, and the symptom is silence — indistinguishable on a screenless rig from a dead
+cable or a crashed set. Error Mode needs an audio-fault state distinct from a Launchpad fault,
+and the Launchpad's text-scroll SysEx is the obvious way to say which.
+
+---
+
+## 12. MIDI controllers — Ampero II Stage
+
+The **Hotone Ampero II Stage** (added 2026-08-09) is the guitar rack and the second MIDI
+controller. Manual + firmware V1.0.2 CC map in `docs/datasheets/`, extracted facts in
+`docs/hotone-ampero-ii-stage-reference.md`. Four load-bearing truths:
+
+| | |
+|---|---|
+| **Send vocabulary is CC/PC only** | Footswitches send max 3 fixed messages per press; patch switch sends max 6. No Notes, no release events |
+| **No native double-press** | Matt wants double-press commands. The Ampero can't distinguish them — a downstream translator must (new Phase 8 Bome input; rig stays out of the performance path per the cornerstone rule) |
+| **Bluetooth MIDI dies at power-up** | All BT switches reset to off on boot (manual p.82) — unusable headless. Wire USB or TRS |
+| **Audio enters analog, not USB** | The Ampero has its own Windows ASIO driver; Ableton binds one ASIO device and that is the EVO 8. Ampero out → EVO 8 line in. Hotone driver NOT installed unless bench test forces it |
+
+Biggest open risk: the manual only documents footswitch/patch MIDI going out the **TRS jack**
+— whether it also transmits over USB is UNVERIFIED and design-killing if false. Bench test
+first (reference doc §8).
+
+## 13. Environment note — other projects
 
 Unrelated project, easy to confuse: `/Users/matt/Documents/Projects/ableton-pedal` is a
 *different* build — Launchpad Mini **MK3**, MOTU M2, NANUK case, CAD-focused. Different device

@@ -1,0 +1,11 @@
+- [ablepad project state](ablepad-project-state.md) — headless Ableton rig on a Beelink; Launchpad X is the whole UI; zero rig code, Phase 0/1 of 9; Config Lab web tool at /lab/ designs the mode configs
+- [Ableton owns performance mapping](ableton-owns-performance-mapping.md) — cornerstone: performance pads map inside Ableton, take precedence in use; rig never builds a performance layer, Phase 8 = handover only
+- [Architect process required](architect-process-required.md) — tree diagram and gap analysis before any code; never generate straight into a file
+- [ROADMAP.md is the todo list](roadmap-is-the-todo-list.md) — every task must name its checkbox; flag drift, mark boxes done with date
+- [EVO 8 and two ESD devices](evo-8-two-esd-devices.md) — audio interface is now an Audient EVO 8; it and the Launchpad both die to ESD, replug-only, and the EVO fails silent
+- [Launchpad X headless trap](launchpad-x-headless-trap.md) — Programmer Mode by SysEx kills the Setup menu; restore Live mode in a `finally` or the panel is unreachable
+- [ablepad vs ableton-pedal](ablepad-vs-ableton-pedal.md) — two similar projects, different devices; SysEx and dimensions do not transfer
+- [Start_DOCS is missing](ablepad-start-docs-missing.md) — every `§n` citation points at a blueprint that lives only on claude.ai
+- [Quick commits preferred](quick-commits-preferred.md) — one commit, short subject, no diff reading by default; `git save` / `git checkpoint` aliases exist for zero-token snapshots
+- [~/Downloads is unreadable](downloads-blocked-fetch-from-vendor.md) — macOS TCC blocks it; fetch datasheets from the vendor CDN into docs/datasheets/ instead
+- [Ampero II Stage controller](ampero-ii-stage-controller.md) — second MIDI controller + guitar rack; CC/PC-only, no native double-press (Bome fuel), BT MIDI off at boot, audio analog into EVO 8

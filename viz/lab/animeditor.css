@@ -1,0 +1,179 @@
+/* ---------------------------------------------------------------- ae- editor
+   Styles for viz/lab/animeditor.js — the animation authoring pane. All classes
+   ae-prefixed; colours come from the :root tokens in lab.css. The board mirrors
+   grid.css's sizing strategy (container query, square cqmin board) so the two
+   surfaces read as the same hardware. */
+
+.ae-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+}
+
+/* ---------------------------------------------------------------- header strip */
+.ae-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  font-size: 12px;
+}
+
+.ae-name { color: var(--foreground); font-weight: 600; }
+.ae-name.ae-muted { color: var(--muted-foreground); font-weight: 400; }
+
+.ae-chip {
+  padding: 1px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: calc(var(--radius) / 2);
+  background: var(--accent);
+  color: var(--muted-foreground);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.ae-btn {
+  font: inherit;
+  font-size: 12px;
+  color: var(--foreground);
+  background: var(--accent);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.ae-btn:hover { background: var(--muted); }
+.ae-btn:disabled { opacity: 0.45; cursor: default; }
+.ae-btn.ae-on { color: var(--warn); border-color: var(--warn); }
+
+.ae-scrub { flex: 1; accent-color: var(--foreground); min-width: 80px; }
+.ae-time { color: var(--muted-foreground); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------------------------------------------------------------- toolbar
+   Brush + eraser + frame strip. Only meaningful for the frames engine — the
+   root's ae-frames class gates visibility so generators get a clean transport. */
+.ae-toolbar {
+  position: relative; /* the palette popover anchors here */
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.ae-root.ae-frames .ae-toolbar { display: flex; }
+
+.ae-brush { display: inline-flex; align-items: center; gap: 6px; }
+.ae-brush-chip {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+}
+
+.ae-strip {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 2px;
+}
+.ae-frame {
+  min-width: 28px;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ae-frame:hover { color: var(--foreground); border-color: var(--border-strong); }
+.ae-frame.ae-on { color: var(--foreground); border-color: var(--ring); background: var(--accent); }
+.ae-frame-op { color: var(--muted-foreground); }
+
+/* ---------------------------------------------------------------- stage + board */
+.ae-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--background);
+  container-type: size;
+}
+
+.ae-empty { display: none; margin: 0; color: var(--muted-foreground); }
+.ae-stage.ae-no-anim .ae-empty { display: block; }
+.ae-stage.ae-no-anim .ae-board { display: none; }
+
+.ae-board {
+  width: 90cqmin;
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  grid-template-rows: repeat(9, 1fr);
+  gap: 1.4cqmin;
+  padding: 2.4cqmin;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.ae-pad {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 1.2cqmin;
+  background: #101013; /* LED off — palette truth, not theme */
+  cursor: crosshair;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.ae-kind-cc-top,
+.ae-kind-cc-right {
+  width: 78%;
+  height: 78%;
+  place-self: center;
+  border-radius: 32%;
+}
+
+.ae-kind-logo {
+  width: 70%;
+  height: 70%;
+  place-self: center;
+  border-radius: 50%;
+  border-style: dashed;
+}
+
+/* ---------------------------------------------------------------- palette popover */
+.ae-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 12px;
+  z-index: 10;
+  padding: 8px;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px #000c;
+}
+.ae-pop-grid { display: grid; gap: 3px; }
+.ae-pop-cell {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.ae-pop-cell:hover { border-color: #fff; }
+.ae-pop-cell.ae-on { border-color: #fff; outline: 1px solid var(--ring); }

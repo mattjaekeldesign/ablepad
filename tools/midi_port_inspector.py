@@ -73,7 +73,7 @@ def report(rec: Recorder, direction: str, names: list[str]) -> list[Port]:
     if launchpad:
         rec.add(f"#   Launchpad {direction} ports: {len(launchpad)}")
         for port in launchpad:
-            note = "" if port.classified_by == "name" else "  <- classified by POSITION"
+            note = "" if port.classified_by == "name" else f"  <- role from INTERFACE NUMBER ({port.interface}), not the name"
             rec.add(f"#     {port.role.value:>7} : {port.name!r}{note}")
     else:
         rec.add("#   No Launchpad ports found. Is it plugged in and out of MSD mode?")
@@ -100,12 +100,16 @@ def verdict(rec: Recorder, ins: list[Port], outs: list[Port]) -> None:
     else:
         rec.add("#   No Launchpad input ports at all.")
 
-    if any(p.classified_by == "ordinal" for p in [*ins, *outs]):
+    if any(p.classified_by == "windows-multiport" for p in [*ins, *outs]):
         rec.add("#")
-        rec.add("#   Some ports were classified by POSITION because their names do not")
-        rec.add("#   contain 'daw' or 'midi'. The manual's ordinal rule is: first")
-        rec.add("#   interface = DAW, second = MIDI. Confirm by behaviour before")
-        rec.add("#   hardcoding either into launchpad/ports.py.")
+        rec.add("#   Windows multi-port naming detected: every port reads 'LPX MIDI' and")
+        rec.add("#   the second interface is marked only by a MIDIIN2/MIDIOUT2 prefix. The")
+        rec.add("#   manual's names (LPX DAW / LPX MIDI, p.6) do not appear at all.")
+        rec.add("#")
+        rec.add("#   Roles above come from the manual's ORDINAL rule -- first interface =")
+        rec.add("#   DAW, second = MIDI (p.6). That is the manual's claim, NOT a measurement.")
+        rec.add("#   Prove it before hardcoding: Programmer Mode only works on the MIDI")
+        rec.add("#   interface, so enter it on the candidate output and press a pad.")
     rec.add()
 
 

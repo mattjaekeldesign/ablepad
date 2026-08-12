@@ -1,0 +1,64 @@
+# Recorded by tools/launchpad_note_tester.py
+# Date:     2026-08-11
+# Machine:  Windows 11
+# Backend:  mido.backends.rtmidi
+# Source:   physical measurement against the hardware
+#
+# Paste into the target module WITH this header. It is the provenance.
+
+# Scope: outer frame only (17 positions)
+
+# --- ANALYSIS ---
+#   positions swept:  17
+#   captured:         16
+#   LED-only (no button under it): 1
+#   skipped/timeout:  0
+#   index mismatches: 0
+
+#   sends NOTE (0): []
+#   sends CC   (16): [19, 29, 39, 49, 59, 69, 79, 89, 91, 92, 93, 94, 95, 96, 97, 98]
+
+#   The CC frame matches the inferred layout exactly:
+#     top row 91-98, right column 19..89 (logo 99 lights only).
+#   This was the main open question. Consider it closed.
+
+# --- PASTE INTO launchpad/grid.py ---
+
+# Measured, not inferred. Every value below was produced by lighting an
+# LED index and recording what pressing that control actually sent.
+
+SENDS_NOTE: frozenset[int] = frozenset({
+    
+})
+
+SENDS_CC: frozenset[int] = frozenset({
+    19, 29, 39, 49, 59, 69, 79, 89, 91, 92, 93, 94, 95, 96, 97, 98
+})
+
+# LED index -> (message type, number). Identical in every verified case
+# means the (row * 10) + column rule holds and grid.py can compute it.
+OBSERVED: dict[int, tuple[str, int]] = {
+    19: ('control_change', 19),
+    29: ('control_change', 29),
+    39: ('control_change', 39),
+    49: ('control_change', 49),
+    59: ('control_change', 59),
+    69: ('control_change', 69),
+    79: ('control_change', 79),
+    89: ('control_change', 89),
+    91: ('control_change', 91),
+    92: ('control_change', 92),
+    93: ('control_change', 93),
+    94: ('control_change', 94),
+    95: ('control_change', 95),
+    96: ('control_change', 96),
+    97: ('control_change', 97),
+    98: ('control_change', 98),
+}
+
+# Addressable but NOT pressable (lights, no button): [99]
+# renderer.py may paint these; mappings.py must never bind an action to one.
+
+# In Programmer mode every control ACCEPTS either note or CC; the split
+# above is only what the device SENDS on press (p.10). read_events() must
+# handle both. set_led() may use either.

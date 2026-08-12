@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "pulse-sweep",
+  "name": "Pulse Sweep",
+  "engine": "generator",
+  "loop": true,
+  "duration_ms": null,
+  "generator": {
+    "type": "PULSE_WAVE",
+    "params": {
+      "direction": "random",
+      "period_ms": 1400,
+      "width": 2.5,
+      "colorMode": "random",
+      "hue": 0,
+      "seed": 3
+    }
+  },
+  "notes": "General-purpose ambient: a soft band sweeping the surface, new random direction and colour every sweep. Meant as a during-loop on layer 'under' so bound pads stay readable."
+}

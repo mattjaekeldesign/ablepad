@@ -18,30 +18,83 @@ npm install     # once
 npm run dev     # http://localhost:5178
 ```
 
-## Reading it
+## Two reading modes
+
+**Outline** is the default and the one to use for reading.
+
+| | Outline | Diagram |
+|---|---|---|
+| Surface | indented text, ordinary scrolling | mermaid SVG |
+| Good at | reading, searching, copying, skimming a phase | seeing branch shape, e.g. the Phase 8 fork |
+| Zoom | none needed | 25–100%, pan, double-click to frame |
+| Text | selectable, always sharp | rasterised vectors |
+
+`M` switches. Search (`/`) is outline-only and switches mode for you.
 
 ```text
 1  Pick a view      Plan · Truth · Compare          keys 1 2 3
-2  Pick a section   sidebar list, derived from the .mmd subgraphs
-3  Walk in order    footer arrows                   keys J / K
-4  Edit content     viz/trees/*.mmd → page reloads on save
+2  Pick a mode      Outline · Diagram               key  M
+3  Pick a section   sidebar list, derived from the .mmd subgraphs
+4  Walk in order    footer arrows                   keys J / K
+5  Edit content     viz/trees/*.mmd → hot-swaps, no reload, position kept
 ```
-
-Clicking a section zooms that pane to it and dims the rest. The **other pane stays where it
-was** — comparing one zoomed side against the other is the whole point.
 
 | Key | Action |
 |---|---|
 | `1` `2` `3` | Plan only · Truth only · Compare |
+| `M` | outline ⇄ diagram |
 | `J` / `K` | next / previous section |
-| `+` / `−` | zoom the visible pane(s) |
-| `F` | fit the whole tree — clamped by the zoom floor, so expect to pan |
-| `0` | reset to the zoom floor |
-| `L` | Tall / Wide layout |
+| `/` | focus search · `Esc` clears |
+| `C` | collapse / expand all sections (outline) |
+| `+` `−` `F` `0` | zoom · fit · 100% (diagram) |
+| `L` | Tall / Wide layout (diagram) |
 | `S` | toggle sidebar |
 
-Scroll = zoom about the cursor. Drag = pan. **Double-click any box** to fill the pane with it.
-Each pane has its own transform and its own zoom readout in its header.
+In diagram mode: scroll = zoom about the cursor, drag = pan, **double-click any box** to frame
+it. Each pane has its own transform and zoom readout. Clicking a section focuses only that
+pane — comparing one zoomed side against the other is the point.
+
+## Progress tracker
+
+The strip under the header shows one number for the whole build, the change since the last
+commit, and — in the dropdown — the ordered next actions.
+
+```text
+BUILD PROGRESS   12.0%   ▲ +2.9 pts since last commit   [██░░░░░░░░]  15 / 125 steps  ▾
+                                                                       └ dropdown ┘
+                   ├── where the number comes from + status chips
+                   ├── per-commit history, each row with its own delta
+                   └── next steps, read live from master.mmd section F
+```
+
+**The rule** (`viz/progress.js`, imported by both the browser and the git endpoint so the two
+cannot disagree):
+
+- Only **leaf** steps of `projected.mmd` count. A phase root or a group header describes work;
+  it is not a checkbox.
+- `done` and `verified` score **1**, `partial` scores **½**, everything else **0**.
+- `branch` nodes are excluded — only one arm of the Phase 8 fork will ever be built, so counting
+  both would cap the total below 100% forever.
+- A `decision` still sits in the denominator. An unmade decision is outstanding work.
+- No effort weighting. A weighting scheme nobody maintains is a lie with decimal places.
+
+**History** comes from `GET /api/progress` (dev server only, `vite.config.js`). It runs
+`git log` for `viz/trees/projected.mmd`, re-scores the file at every commit that touched it via
+`git show <sha>:<file>`, and appends the working tree as an extra row when it is dirty. Git is
+read-only there — `log`, `show`, `status`, nothing else. Commits where the file scored zero
+checkboxes are skipped: that is a file that was not this tree yet, not a 0% milestone.
+
+In a static build there is no API, so the strip shows the live score and says the history needs
+the dev server. It never fabricates a delta.
+
+**To move the number, edit a status class in `projected.mmd`** — the strip updates on the same
+hot-swap as the trees, with no reload.
+
+## Position memory
+
+View, mode, layout, section cursor, search text, per-pane zoom/pan and outline scroll are
+written to `sessionStorage` on every change and restored on load. If the page does reload — an
+edit to `main.js`, a Vite restart — you land back where you were.
 
 ### Tall vs Wide
 
@@ -67,12 +120,29 @@ blurry.
 ```text
 viz/
 ├── index.html   shell · tabs · sidebar cards · stepper   — owns layout
-├── main.js      mermaid init · section parser · pan/zoom — owns behaviour only
-├── style.css    shadcn-style zinc-dark tokens            — owns chrome colour
+├── main.js      controller: modes, sections, pan/zoom, position memory
+├── trees.js     the .mmd sources + the ONLY HMR hook      — owns content loading
+├── parse.js     .mmd → { sections, nodes, counts }        — owns text→data
+├── outline.js   parsed tree → text DOM                    — owns the text view
+├── progress.js  the scoring rule — shared with vite.config.js, never duplicated
+├── progressbar.js  the progress strip + next-steps dropdown
+├── style.css    shadcn-style zinc-dark tokens             — owns chrome colour
 └── trees/
     ├── projected.mmd   PLAN  — 10 sections, phases 0-9, every step numbered
     └── master.mmd      TRUTH — 6 sections, A-F, only what exists
 ```
+
+`parse.js` is the single parser: the outline rows, the sidebar sections and the header status
+chips all come from it. It understands only the mermaid subset we author, and ignores anything
+it cannot classify — a half-parsed outline beats a blank pane, and the diagram is the authority
+if the two ever disagree.
+
+### Why trees.js exists
+
+A `?raw` import is a string, and Vite cannot hot-update a string module — so editing a tree
+used to force a **full page reload**, throwing away your section, scroll and zoom. `trees.js`
+self-accepts and notifies subscribers instead, so a `.mmd` edit swaps the text in place. Do not
+move the glob back into `main.js`; the reload comes straight back.
 
 **Edit `trees/*.mmd`. Never edit `main.js` to change content.** Two things are derived from the
 source files at load:

@@ -62,7 +62,7 @@ at, and vice versa. Split it this way:
 | Hold-to-confirm timing | **Bome** | Timers are non-blocking and killable |
 | LED animations | **Contested** | See note below — batch SysEx changed this |
 | Keystrokes / mouse into Ableton | **Bome** | Windows-only injection targets a window without focusing it |
-| **Focusrite detection** | **Python** | Bome only sees MIDI devices. The Scarlett is a MEDIA-class audio device — invisible to Bome |
+| **Audio interface detection** | **Python** | Bome only sees MIDI devices. The EVO 8 is a MEDIA-class audio device — invisible to Bome |
 | Ableton process supervision & crash recovery | **Python** | `psutil`, restart limits, state machine |
 | `.als` folder scanning | **Python** | Bome cannot enumerate a directory |
 | Hotspot, SSH, reboot/shutdown | **Python** | PowerShell wrappers already designed |
@@ -178,8 +178,10 @@ Translator: "Launchpad unplugged → tell the Rig Controller"
 **A pending port — used in the project but not currently plugged in — does not fire "Opened".**
 So boot ordering is safe: Bome can start before the Launchpad is enumerated and still catch it.
 
-**The Focusrite is invisible here.** It is an audio device, not a MIDI device. Keep
+**The EVO 8 is invisible here.** It is an audio device, not a MIDI device. Keep
 `AudioInterfaceDetector` and its `Get-PnpDevice` PowerShell query in Python exactly as designed.
+Note also that the EVO Mixer tray app is a third always-on process — adopting Bome would make
+four, before Ableton and the Rig Controller are counted.
 
 > **Unresolved, and it matters.** If Bome owns the port and Bome crashes, nothing restores Live
 > mode on the Launchpad — the Setup menu stays disabled and the panel is unreachable on a
@@ -293,7 +295,7 @@ File to Execute:  C:\LiveRig\Controller\commands\load-set.cmd
 Parameters:       "%d gn%"
 ```
 
-`load-set.cmd` resolves `01*.als`, checks the Focusrite is present, closes the running instance
+`load-set.cmd` resolves `01*.als`, checks the EVO 8 is present, closes the running instance
 cleanly, logs, then launches. This keeps every safety rule from §24/§28 in Python where it
 belongs. **Prefer Option B.**
 
@@ -348,7 +350,7 @@ history — confirm exact syntax and whether they apply to a running instance in
 relying on them.
 
 This gives the Python controller a clean way to push state onto the Launchpad without owning the
-MIDI port. Example: Focusrite detected → `-setVar ga 1` → a Bome translator turns the interface
+MIDI port. Example: EVO 8 detected → `-setVar ga 1` → a Bome translator turns the interface
 status pad green.
 
 **Bome → Python**: Execute File, calling small `.cmd`/`.ps1` wrappers under
@@ -427,7 +429,7 @@ Applies **only if Bome is adopted at Phase 8.**
 | §23 Set Selection | Hold-to-confirm becomes a Bome timer (Activate on press / Kill on release). Never use the outgoing Delay field. |
 | §24 Ableton Launcher | Keep in Python. Bome's Execute File calls `load-set.cmd`. |
 | §25 Unsaved-Changes Prompts | Injected mouse/keystroke events give a *backup* way to dismiss a stray dialog — read-only Stable sets remain the primary defence. |
-| §26 Focusrite Detection | Unchanged. Bome cannot see audio devices. |
+| §26 Audio Interface Detection | Unchanged. Bome cannot see audio devices — see `audient-evo-8-reference.md`. |
 | §30 MIDI Routing | Two input ports do exist, so Strategy A is possible — but it cannot give both programs the same pad press. Choose deliberately at Phase 8. |
 | §36 Health Monitoring | Add: is MT Pro running? Did any MIDI Port Open Error fire? |
 | §38 Error Categories | Add "MIDI port open error (port held by another process)". |

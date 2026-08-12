@@ -17,9 +17,15 @@
  *   'dirty:changed'    (bool)                — unsaved-changes flag flipped
  *   'sim:changed'      (bool)                — simulate mode toggled
  *   'toast'            ({ kind, text })      — user-visible notice ('ok' | 'warn' | 'error')
+ *
+ *   'animlib:changed'  (index array)         — the animation list was (re)fetched
+ *   'anim:loaded'      (anim | null)         — an animation was opened / reverted / closed
+ *   'anim:changed'     ({})                  — the open animation mutated
+ *   'animdirty:changed'(bool)                — unsaved-animation flag flipped
+ *   'animframe:selected'(index)              — the Anim editor's active frame changed
  */
 import * as api from './api.js'
-import { defaultConfig, defaultPad, validateConfig } from './schema.js'
+import { defaultConfig, defaultPad, defaultAnimation, validateConfig, validateAnimation } from './schema.js'
 
 /* ═══════════════════════════════════════════════════════════════ state + events */
 
@@ -32,6 +38,11 @@ export const store = {
     dirty: false,
     selectedPad: null, // "11"…"99" or null (null → inspector shows config-level settings)
     sim: false, // simulate mode: grid presses run LED feedback + actions
+
+    animLibrary: [], // [{ id, name, engine, modified }]
+    anim: null, // the OPEN animation — a working copy, independent of the open config
+    animDirty: false,
+    animFrame: 0, // which frame the Anim editor is painting (frames engine)
   },
   on(event, fn) {
     if (!listeners.has(event)) listeners.set(event, new Set())
@@ -51,7 +62,22 @@ function setDirty(v) {
   store.emit('dirty:changed', v)
 }
 
+function setAnimDirty(v) {
+  if (S.animDirty === v) return
+  S.animDirty = v
+  store.emit('animdirty:changed', v)
+}
+
 export const toast = (kind, text) => store.emit('toast', { kind, text })
+
+/** Anything unsaved anywhere? The topbar dirty flag and beforeunload guard use this. */
+export const anyDirty = () => S.dirty || S.animDirty
+
+/** One save entry point for ⌘S and the Save buttons: flush whatever is dirty. */
+export async function saveAll() {
+  if (S.dirty) await saveConfig()
+  if (S.animDirty) await saveAnimation()
+}
 
 /* ═══════════════════════════════════════════════════════════════ library actions */
 
@@ -162,6 +188,107 @@ export function setTransitions(transitions) {
   S.config.transitions = transitions
   setDirty(true)
   store.emit('config:changed', {})
+}
+
+/* ═══════════════════════════════════════════════════════════ animation library
+   Mirrors the config lifecycle exactly — a second entity type, same discipline.
+   The resolve cache exists for the grid's compositor: screens reference animations
+   by id, and repainting must never wait on a fetch mid-frame. */
+
+const animCache = new Map() // id → animation, as last seen on disk
+
+export async function loadAnimLibrary() {
+  S.animLibrary = await api.listAnimations()
+  store.emit('animlib:changed', S.animLibrary)
+  return S.animLibrary
+}
+
+export async function openAnimation(id) {
+  const anim = await api.getAnimation(id)
+  const { ok, errors } = validateAnimation(anim)
+  if (!ok) toast('warn', `${id}.json has issues: ${errors[0]}${errors.length > 1 ? ` (+${errors.length - 1})` : ''}`)
+  S.anim = anim
+  S.animFrame = 0
+  setAnimDirty(false)
+  store.emit('anim:loaded', anim)
+  store.emit('animframe:selected', 0)
+  return anim
+}
+
+export async function saveAnimation() {
+  if (!S.anim) return
+  const { ok, errors } = validateAnimation(S.anim)
+  if (!ok) {
+    toast('error', `not saved — ${errors[0]}`)
+    return
+  }
+  await api.putAnimation(S.anim)
+  animCache.set(S.anim.id, structuredClone(S.anim))
+  setAnimDirty(false)
+  toast('ok', `saved ${S.anim.id}.json`)
+  await loadAnimLibrary()
+}
+
+export async function createAnimation(id, name, engine) {
+  const anim = defaultAnimation(id, name, engine)
+  await api.putAnimation(anim)
+  await loadAnimLibrary()
+  return openAnimation(id)
+}
+
+export async function duplicateAnimation(sourceId, newId, newName) {
+  const source = await api.getAnimation(sourceId)
+  const copy = { ...structuredClone(source), id: newId, name: newName }
+  await api.putAnimation(copy)
+  await loadAnimLibrary()
+  return openAnimation(newId)
+}
+
+export async function deleteAnimation(id) {
+  await api.deleteAnimationFile(id)
+  animCache.delete(id)
+  if (S.anim?.id === id) {
+    S.anim = null
+    setAnimDirty(false)
+    store.emit('anim:loaded', null)
+  }
+  await loadAnimLibrary()
+}
+
+export async function revertAnimation() {
+  if (S.anim) await openAnimation(S.anim.id)
+}
+
+/**
+ * Animation for a config's ref, for RENDERING. The open working copy wins so edits
+ * preview live on the mapper; otherwise disk, cached until a save/delete replaces it.
+ */
+export async function resolveAnimation(id) {
+  if (S.anim?.id === id) return S.anim
+  if (!animCache.has(id)) animCache.set(id, await api.getAnimation(id))
+  return animCache.get(id)
+}
+
+/** Patch the open animation. Objects merge; arrays and scalars replace (mergeDeep). */
+export function updateAnim(patch) {
+  if (!S.anim) return
+  mergeDeep(S.anim, patch)
+  setAnimDirty(true)
+  store.emit('anim:changed', {})
+}
+
+/** Replace the frame list wholesale — the Anim editor edits frames as a unit. */
+export function updateAnimFrames(frames) {
+  if (!S.anim) return
+  S.anim.frames = frames
+  if (S.animFrame >= frames.length) selectAnimFrame(Math.max(0, frames.length - 1))
+  setAnimDirty(true)
+  store.emit('anim:changed', {})
+}
+
+export function selectAnimFrame(index) {
+  S.animFrame = index
+  store.emit('animframe:selected', index)
 }
 
 /* ═══════════════════════════════════════════════════════════════ selection + sim */

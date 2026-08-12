@@ -1,7 +1,7 @@
 # ablepad
 
 Control software for a headless Ableton Live performance rig. A Beelink mini PC, a Novation
-Launchpad X, and a Focusrite Scarlett in a box that behaves like a guitar pedal — no monitor,
+Launchpad X, and an Audient EVO 8 in a box that behaves like a guitar pedal — no monitor,
 no keyboard, no mouse, no internet.
 
 **Status:** design documented, implementation not started. Phase 0/1 of 9.
@@ -14,6 +14,7 @@ no keyboard, no mouse, no internet.
 | `docs/ROADMAP.md` | **Authoritative build order.** Nine phases, exit tests, live risk register |
 | `docs/launchpad-x-sysex.md` | The MIDI/SysEx spec. Source of truth for `launchpad/` constants |
 | `docs/launchpad-x-hardware.md` | Device settings, ESD, Live vs Programmer mode |
+| `docs/audient-evo-8-reference.md` | The audio interface. Driver, tray app, ESD failure mode |
 | `docs/bome-mt-pro-reference.md` | Bome MIDI Translator evaluation. **Not adopted** — Phase 8 decides |
 
 ## Target environment

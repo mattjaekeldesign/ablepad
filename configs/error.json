@@ -13,7 +13,8 @@
     "99": { "label": "", "led": { "idle": { "type": "flash", "palette": 5, "paletteB": 0 } }, "action": { "type": "NONE", "params": {} } },
     "11": { "label": "Retry", "led": { "idle": { "type": "static", "palette": 19 }, "pressed": { "type": "static", "palette": 21 } }, "action": { "type": "SWITCH_MODE", "params": { "target": "set-browser" } } }
   },
+  "animations": { "intro": null, "during": { "ref": "error-spin", "layer": "under" } },
   "transitions": [{ "on": "SWITCH_MODE", "to": "set-browser" }],
-  "notes": "The real rig names the fault by scrolling text across the pads via SysEx 07h — 'NO ASIO', 'SET MISSING', 'LP LOST' — cheaper than a colour code anyone has to memorise. The Lab only mocks the static look; scrolling is hardware-side.",
+  "notes": "The real rig names the fault by scrolling text across the pads via SysEx 07h — 'NO ASIO', 'SET MISSING', 'LP LOST' — cheaper than a colour code anyone has to memorise. The Lab only mocks the static look; scrolling is hardware-side. The error-spin ring runs on layer 'under': the red centre block, the logo flash and the Retry pad all stay lit and pressable through it.",
   "meta": { "flowPos": { "x": 760, "y": 260 } }
 }

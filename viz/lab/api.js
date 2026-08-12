@@ -28,4 +28,10 @@ export const listConfigs = () => request('GET', '/api/configs')
 export const getConfig = (id) => request('GET', `/api/configs/${id}`)
 export const putConfig = (config) => request('PUT', `/api/configs/${config.id}`, config)
 export const deleteConfig = (id) => request('DELETE', `/api/configs/${id}`)
+
+export const listAnimations = () => request('GET', '/api/animations')
+export const getAnimation = (id) => request('GET', `/api/animations/${id}`)
+export const putAnimation = (anim) => request('PUT', `/api/animations/${anim.id}`, anim)
+export const deleteAnimationFile = (id) => request('DELETE', `/api/animations/${id}`)
+
 export const getPalette = () => request('GET', '/api/palette')

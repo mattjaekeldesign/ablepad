@@ -12,21 +12,37 @@
  * What it returns: nothing — it owns the #library subtree and re-renders on store events.
  */
 import * as api from './api.js'
-import { validateConfig } from './schema.js'
+import { validateConfig, validateAnimation, ANIM_ENGINES } from './schema.js'
 import {
   store,
   toast,
   loadLibrary,
+  loadAnimLibrary,
   openConfig,
-  saveConfig,
+  saveAll,
+  anyDirty,
   createConfig,
   duplicateConfig,
   deleteConfig,
   revertConfig,
+  openAnimation,
+  createAnimation,
+  duplicateAnimation,
+  deleteAnimation,
+  revertAnimation,
 } from './store.js'
 
 /** Display order for the grouped list. Unknown kinds land in 'other'; 'broken' is last. */
 const KIND_ORDER = ['mode', 'page', 'overlay']
+
+/** The New form creates either entity; anim kinds carry their engine in the value. */
+const NEW_KINDS = [
+  { value: 'mode', label: 'screen · mode' },
+  { value: 'page', label: 'screen · page' },
+  { value: 'overlay', label: 'screen · overlay' },
+  { value: 'anim:generator', label: 'animation · generator' },
+  { value: 'anim:frames', label: 'animation · frames' },
+]
 
 /* ═══════════════════════════════════════════════════════════════════ helpers */
 
@@ -40,13 +56,16 @@ function slugify(name) {
     .replace(/^[-_]+/, '')
 }
 
-/** Slug that is guaranteed not to collide with any library id (appends -2, -3, …). */
+/** Slug that collides with NEITHER library — configs and animations share the id space
+    for sanity's sake, even though they live in different directories. */
 function uniqueSlug(base) {
   if (!base) return ''
-  const taken = new Set(store.state.library.map((e) => e.id))
+  const taken = new Set([...store.state.library, ...store.state.animLibrary].map((e) => e.id))
   if (!taken.has(base)) return base
   for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`
 }
+const slugTaken = (slug) =>
+  store.state.library.some((e) => e.id === slug) || store.state.animLibrary.some((e) => e.id === slug)
 
 /** Browser-side file download — export never touches the server beyond the GET. */
 function download(filename, text) {
@@ -78,10 +97,8 @@ export function initLibrary(rootEl) {
     </div>
     <form class="lib-new-form" hidden>
       <input class="lib-input" data-lib="new-name" type="text" placeholder="Name" autocomplete="off" spellcheck="false" />
-      <select class="lib-select" data-lib="new-kind" title="Config kind">
-        <option value="mode">mode</option>
-        <option value="page">page</option>
-        <option value="overlay">overlay</option>
+      <select class="lib-select" data-lib="new-kind" title="What to create">
+        ${NEW_KINDS.map((k) => `<option value="${k.value}">${k.label}</option>`).join('')}
       </select>
       <div class="lib-new-id"></div>
       <div class="lib-new-actions">
@@ -134,6 +151,15 @@ export function initLibrary(rootEl) {
     }
 
     if (!lib.length) listEl.append(el('div', 'lib-empty', 'No configs yet — create one with New.'))
+
+    // Animations — the second entity family, one flat group under the screens.
+    const anims = store.state.animLibrary ?? []
+    if (anims.length) {
+      const group = el('div', 'lib-group')
+      group.append(el('div', 'lib-group-title', 'animations'))
+      for (const entry of anims) group.append(buildAnimRow(entry))
+      listEl.append(group)
+    }
   }
 
   function buildRow(entry, broken) {
@@ -161,6 +187,28 @@ export function initLibrary(rootEl) {
     )
     row.append(actions)
     row.addEventListener('click', () => onOpen(entry))
+    return row
+  }
+
+  function buildAnimRow(entry) {
+    const isActive = store.state.anim?.id === entry.id
+    const row = el('div', 'lib-row')
+    if (isActive) row.classList.add('lib-active')
+
+    const main = el('div', 'lib-row-main')
+    const nameEl = el('div', 'lib-name', entry.name || entry.id)
+    if (isActive && store.state.animDirty) nameEl.append(el('span', 'lib-dot', ' •'))
+    main.append(nameEl, el('div', 'lib-id', `${entry.id} · ${entry.engine ?? '?'}`))
+    row.append(main)
+
+    const actions = el('div', 'lib-row-actions')
+    actions.append(
+      iconBtn('⧉', `Duplicate "${entry.name}"`, () => onDuplicateAnim(entry)),
+      iconBtn('↧', `Export ${entry.id}.json`, () => onExportAnim(entry)),
+      iconBtn('✕', `Delete "${entry.name}"`, () => onDeleteAnim(entry)),
+    )
+    row.append(actions)
+    row.addEventListener('click', () => onOpenAnim(entry))
     return row
   }
 
@@ -206,6 +254,55 @@ export function initLibrary(rootEl) {
     await deleteConfig(entry.id)
   }
 
+  /* ─────────────────────────────────────────────────────── animation row actions */
+
+  async function onOpenAnim(entry) {
+    if (store.state.anim?.id === entry.id) {
+      store.emit('view:request', 'anim')
+      return
+    }
+    if (store.state.animDirty && !confirm(`discard unsaved changes to ${store.state.anim?.name}?`)) return
+    await openAnimation(entry.id)
+    store.emit('view:request', 'anim') // opening an animation means editing it
+  }
+
+  async function onDuplicateAnim(entry) {
+    const name = prompt(`Name for the copy of "${entry.name}"`, `${entry.name} copy`)
+    if (!name) return
+    const id = uniqueSlug(slugify(name))
+    if (!id) return toast('error', 'that name produces an empty id')
+    await duplicateAnimation(entry.id, id, name.trim())
+    store.emit('view:request', 'anim')
+  }
+
+  async function onExportAnim(entry) {
+    try {
+      const anim = await api.getAnimation(entry.id)
+      download(`${entry.id}.json`, JSON.stringify(anim, null, 2))
+    } catch (err) {
+      toast('error', `export failed — ${err.message}`)
+    }
+  }
+
+  async function onDeleteAnim(entry) {
+    // Deleting a referenced animation is allowed — configs keep the ref, the renderer
+    // skips it, the inspector flags it. Name the consequence at the moment of choice.
+    const refs = usedBy(entry.id)
+    const warning = refs.length ? `\n\nStill referenced by: ${refs.join(', ')} — those screens will warn.` : ''
+    if (!confirm(`delete "${entry.name}" (${entry.id}.json)? This removes the file.${warning}`)) return
+    await deleteAnimation(entry.id)
+  }
+
+  /** Which OPEN-able configs reference this animation (index has no slots — best effort
+      from the open config only; the inspector does the authoritative dangling check). */
+  function usedBy(animId) {
+    const open = store.state.config
+    if (!open?.animations) return []
+    return Object.entries(open.animations)
+      .filter(([, b]) => b?.ref === animId)
+      .map(([slot]) => `${open.id}.${slot}`)
+  }
+
   /* ─────────────────────────────────────────────────────────────── new form */
 
   function newFormSlug() {
@@ -214,7 +311,7 @@ export function initLibrary(rootEl) {
 
   function refreshNewForm() {
     const slug = newFormSlug()
-    const taken = store.state.library.some((e) => e.id === slug)
+    const taken = slugTaken(slug)
     createBtn.disabled = !slug || taken
     newIdEl.classList.toggle('lib-warn', taken)
     newIdEl.textContent = !slug ? '' : taken ? `id "${slug}" is taken` : `id: ${slug}`
@@ -236,8 +333,14 @@ export function initLibrary(rootEl) {
   newForm.addEventListener('submit', async (e) => {
     e.preventDefault()
     const slug = newFormSlug()
-    if (!slug || store.state.library.some((c) => c.id === slug)) return
-    await createConfig(slug, nameInput.value.trim(), kindSelect.value)
+    if (!slug || slugTaken(slug)) return
+    const kind = kindSelect.value
+    if (kind.startsWith('anim:')) {
+      await createAnimation(slug, nameInput.value.trim(), kind.slice('anim:'.length))
+      store.emit('view:request', 'anim') // straight into the editor — that's why it was made
+    } else {
+      await createConfig(slug, nameInput.value.trim(), kind)
+    }
     closeNewForm()
   })
 
@@ -250,24 +353,34 @@ export function initLibrary(rootEl) {
     fileInput.value = '' // re-selecting the same file must fire 'change' again
     if (!file) return
 
-    let config
+    let data
     try {
-      config = JSON.parse(await file.text())
+      data = JSON.parse(await file.text())
     } catch {
       return toast('error', `${file.name} is not valid JSON`)
     }
 
-    const { ok, errors } = validateConfig(config)
+    // One Import button, two entity types: the `engine` field is the discriminator —
+    // configs never have one, animations always do.
+    const isAnim = ANIM_ENGINES.includes(data.engine)
+    const { ok, errors } = isAnim ? validateAnimation(data) : validateConfig(data)
     if (!ok) return toast('error', errors[0])
 
-    const exists = store.state.library.some((e) => e.id === config.id)
-    if (exists && !confirm(`"${config.id}" already exists — overwrite it?`)) return
+    const pool = isAnim ? store.state.animLibrary : store.state.library
+    if (pool.some((e) => e.id === data.id) && !confirm(`"${data.id}" already exists — overwrite it?`)) return
 
     try {
-      await api.putConfig(config)
-      await loadLibrary()
-      await openConfig(config.id)
-      toast('ok', `imported ${config.id}.json`)
+      if (isAnim) {
+        await api.putAnimation(data)
+        await loadAnimLibrary()
+        await openAnimation(data.id)
+        store.emit('view:request', 'anim')
+      } else {
+        await api.putConfig(data)
+        await loadLibrary()
+        await openConfig(data.id)
+      }
+      toast('ok', `imported ${data.id}.json`)
     } catch (err) {
       toast('error', `import failed — ${err.message}`)
     }
@@ -276,19 +389,23 @@ export function initLibrary(rootEl) {
   /* ─────────────────────────────────────────────────────────────── footer */
 
   function refreshFoot() {
-    const canWrite = !!store.state.config && store.state.dirty
-    saveBtn.disabled = !canWrite
-    revertBtn.disabled = !canWrite
+    saveBtn.disabled = !anyDirty()
+    revertBtn.disabled = !anyDirty()
     // Quiet "saved" affordance: same button, calmer label, no toast from here.
-    saveBtn.textContent = store.state.config && !store.state.dirty ? 'Saved' : 'Save'
+    const anythingOpen = store.state.config || store.state.anim
+    saveBtn.textContent = anythingOpen && !anyDirty() ? 'Saved' : 'Save'
   }
 
-  saveBtn.addEventListener('click', () => saveConfig())
+  saveBtn.addEventListener('click', () => saveAll())
   revertBtn.addEventListener('click', () => {
-    const open = store.state.config
-    if (!open) return
-    if (!confirm(`revert "${open.name}" to the saved file?`)) return
-    revertConfig()
+    const names = [
+      store.state.dirty ? `"${store.state.config?.name}"` : null,
+      store.state.animDirty ? `"${store.state.anim?.name}"` : null,
+    ].filter(Boolean)
+    if (!names.length) return
+    if (!confirm(`revert ${names.join(' and ')} to the saved file${names.length > 1 ? 's' : ''}?`)) return
+    if (store.state.dirty) revertConfig()
+    if (store.state.animDirty) revertAnimation()
   })
 
   /* ─────────────────────────────────────────────────────── store subscriptions */
@@ -297,12 +414,24 @@ export function initLibrary(rootEl) {
     renderList()
     refreshNewForm() // a rename/delete elsewhere can free or take the pending slug
   })
+  store.on('animlib:changed', () => {
+    renderList()
+    refreshNewForm()
+  })
   store.on('config:loaded', () => {
+    renderList()
+    refreshFoot()
+  })
+  store.on('anim:loaded', () => {
     renderList()
     refreshFoot()
   })
   store.on('dirty:changed', () => {
     renderList() // the unsaved dot lives on the active row
+    refreshFoot()
+  })
+  store.on('animdirty:changed', () => {
+    renderList()
     refreshFoot()
   })
 

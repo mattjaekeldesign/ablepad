@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "boot-rain",
+  "name": "Boot Rain",
+  "engine": "generator",
+  "loop": false,
+  "duration_ms": 4000,
+  "generator": {
+    "type": "RAIN",
+    "params": {
+      "density": 8,
+      "speed": 9,
+      "tail": 4,
+      "colorMode": "random",
+      "hue": 0,
+      "seed": 7
+    }
+  },
+  "notes": "Boot intro: random-coloured drops falling top-down for 4 s, then the boot screen reveals. Any press skips it — the failsafe cap in the player is 15 s regardless."
+}

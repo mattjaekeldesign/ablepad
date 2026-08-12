@@ -35,6 +35,107 @@ messages; it needs one SysEx. Python-side LED animation is viable.
 
 ---
 
+## 1b. MEASURED ON HARDWARE — 2026-08-12
+
+First bench session, Beelink `RIG`, Launchpad X firmware **0.3.5.1**, over SSH. Everything
+in this section was observed on the device, not read out of the manual. Where the two
+disagree, this section wins.
+
+### Confirmed as documented
+
+| Claim | Evidence |
+|---|---|
+| Two independent MIDI interfaces on Windows | Both enumerate, both open cleanly |
+| Programmer Mode SysEx `0E 01` | Sent to interface 2 → surface went dark, then accepted LED writes |
+| **81 colourspecs in ONE SysEx lights the whole 9×9** | One message, 81 entries, entire surface lit. The batch-LED claim is now measured |
+| Release = Note On velocity 0 | `note_on note=27 velocity=0` observed on every release |
+| First interface = DAW, second = MIDI (p.6 ordinal rule) | In Programmer Mode all pad traffic arrived on interface 2; interface 1 was **completely silent** (0 messages) |
+| Restore to Live Mode | Ran clean on every exit, including the failure runs |
+
+### Contradicted or missing from the manual
+
+**Windows port names are nothing like the manual's.** p.6 promises `LPX DAW In/Out` and
+`LPX MIDI In/Out`. Windows reports:
+
+```text
+INPUTS    'LPX MIDI 0'            'MIDIIN2 (LPX MIDI) 1'
+OUTPUTS   'LPX MIDI 1'            'MIDIOUT2 (LPX MIDI) 2'
+          └─ interface 1 = DAW    └─ interface 2 = MIDI  ← the rig's port
+```
+
+Windows applies its own multi-port convention: the first interface takes the bare device
+name, later ones get a `MIDIIN<n>` / `MIDIOUT<n>` prefix. The word "DAW" never appears, and
+every port contains "MIDI". Any classifier that keys on those substrings picks wrong — see
+`tools/_bench.py`, which did exactly that and had to be rewritten.
+
+**Device inquiry byte 7 is `0x03`, not `0x13`.** p.6 prints:
+
+```text
+manual:    7E 00 06 02 00 20 29 13 01 00 00 <4 version bytes>
+measured:  7E 00 06 02 00 20 29 03 01 00 00 00 03 05 01
+                                 ^^
+```
+
+The state byte after it (`01` = application) does match. A parser that validates `0x13`
+rejects the real device — which is silent failure in the boot-time presence check, the one
+place the rig most needs the truth.
+
+### The trap that made input look dead
+
+**python-rtmidi discards SysEx by default.** `RtMidiIn` defaults to
+`ignoreTypes(sysex=True, timing=True, active_sense=True)` and mido does not clear it.
+
+Consequence, observed: the device inquiry reply never arrived, so a perfectly healthy
+Launchpad reported "no reply". Notes and CCs came through fine, which is what made it look
+like a hardware fault instead of a library default. **Every readback command in the §10
+table is unusable without clearing this.** `_bench.py` now clears it on open.
+
+### Device settings arrive in the worst possible state
+
+Straight out of the box, before any configuration SysEx:
+
+- **Aftertouch is ON.** Roughly ten pad presses produced **130 MIDI messages**, the large
+  majority `polytouch`. This is precisely the event-loop flood §8 warns about, now measured
+  rather than predicted.
+- **Velocity sensitivity is ON.** Observed note-on velocities ranged 21–127 across presses of
+  the same pads.
+
+Both are why the connect sequence in §11 asserts fixed velocity and aftertouch-off at every
+boot rather than trusting a bench checklist.
+
+### CC frame — CLOSED
+
+`launchpad_note_tester.py --frame`, 17 positions, guided sweep. Each LED index was lit in
+turn and the resulting press recorded. **16 of 16 pressable controls matched their LED index
+exactly. Zero mismatches, zero timeouts.**
+
+```text
+top row      CC 91 92 93 94 95 96 97 98      all confirmed
+right column CC 19 29 39 49 59 69 79 89      all confirmed
+logo         LED 99                          lights, NOT a button
+```
+
+Every one reports value 127 on press. The inferred layout was right, and it is now measured
+rather than assumed. Result file: `tools/results/grid-frame.txt`.
+
+**This also confirms p.15's claim that LED index and input number are the same number** — 16
+independent data points, no disagreement. `grid.py` can compute the mapping instead of
+carrying a table.
+
+> ⚠️ **LED 99 is addressable but has no button under it.** Confirmed on the hardware. Earlier
+> notes in this repo described it as "CC 99 → logo LED", which reads as though it might be
+> pressable. It is not. `renderer.py` may paint it; `mappings.py` must never bind an action
+> to it, and any layout that puts a function there is a layout with a dead control.
+
+### 8×8 grid — partially confirmed
+
+Casual pressing produced notes **27, 28, 37, 55, 66, 76, 77** — every one fits
+`(row × 10) + column` with row and column in 1–8. The corners are confirmed in the manual's
+prose (p.14). A full 64-pad sweep would close it completely, but the rule now has 7 measured
+interior points plus 3 documented corners and no contradictions.
+
+---
+
 ## 2. USB interfaces
 
 Two MIDI in/out pairs over USB (p.6):
@@ -190,14 +291,13 @@ name pads in prose:
 - `12h` (18) — "the lower right one" ✅
 
 Three corners pin the origin, the row stride and the column stride, so the 8×8 pad grid
-(11–88) can be treated as solid. What is **not** confirmed by any prose:
+(11–88) can be treated as solid. The CC frame is **no longer inferred** — see §1b. Measured 2026-08-12:
 
-- The top row of function buttons as **CC 91–98**
-- The right-hand scene-launch column as **CC 19, 29, 39, 49, 59, 69, 79, 89**
-- The logo LED as **CC 99**
+- Top row **CC 91–98** ✅ confirmed
+- Right-hand scene-launch column **CC 19, 29, 39, 49, 59, 69, 79, 89** ✅ confirmed
+- Logo **LED 99** — addressable, but **not a button**. Nothing to bind.
 
-These are the ones the Set Browser depends on for pagination and System Mode access. Verify with
-`tools/launchpad_note_tester.py` before wiring mappings. This is exactly the Phase 1 exit test.
+All 16 pressable frame controls report a CC number identical to their LED index.
 
 The manual does confirm (p.10) that **in Programmer mode every pad and button accepts either
 Note or Control Change**. The Note/CC split is only what the device *sends* on press. So

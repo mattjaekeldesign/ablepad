@@ -17,6 +17,7 @@
   --radius: 8px;
   --header-h: 56px;
   --footer-h: 44px;
+  --strip-h: 46px;
 }
 
 * { box-sizing: border-box; }
@@ -120,6 +121,7 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .92em;
   transition: background .12s, border-color .12s;
 }
 .btn:hover { background: var(--accent); border-color: var(--border-strong); }
+a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 .btn.ghost { background: transparent; color: var(--muted-foreground); }
 .btn.ghost:hover { color: var(--foreground); background: var(--muted); }
 .btn:disabled { opacity: .4; cursor: default; }
@@ -127,8 +129,140 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .92em;
 /* ----------------------------------------------------------------- shell */
 .shell {
   display: flex;
-  height: calc(100% - var(--header-h) - var(--footer-h));
+  height: calc(100% - var(--header-h) - var(--strip-h) - var(--footer-h));
 }
+
+/* ------------------------------------------------------- progress strip
+   Sits between the header and the workspace. The summary row is always visible;
+   the panel below it is a dropdown, so the breakdown never costs vertical space. */
+.progress-strip {
+  position: relative;
+  height: var(--strip-h);
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  z-index: 20;
+}
+
+.pg-summary {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; height: var(--strip-h);
+  padding: 0 14px;
+  background: transparent; border: 0;
+  color: var(--foreground);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.pg-summary:hover { background: #ffffff05; }
+
+.pg-label {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.pg-pct {
+  font-size: 19px; font-weight: 650;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  min-width: 66px;
+}
+.pg-delta {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--muted);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.pg-delta.up   { color: #86efac; border-color: #22c55e55; background: #052e1b; }
+.pg-delta.down { color: #fca5a5; border-color: #ef444455; background: #450a0a; }
+
+.pg-track {
+  flex: 1; min-width: 80px; height: 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+.pg-fill {
+  display: block; height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e, #84cc16);
+  transition: width 400ms cubic-bezier(.22,.61,.36,1);
+}
+.pg-meta { font-size: 11px; color: var(--muted-foreground); white-space: nowrap; }
+.pg-caret { color: var(--muted-foreground); transition: transform .15s; }
+.progress-strip.open .pg-caret { transform: rotate(180deg); }
+
+/* dropdown */
+.pg-panel {
+  position: absolute; left: 0; right: 0; top: var(--strip-h);
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 18px 40px #000a;
+  max-height: 62vh; overflow-y: auto;
+}
+.pg-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(300px, 1.4fr) minmax(260px, 1.2fr);
+  gap: 1px;
+  background: var(--border);
+}
+@media (max-width: 1100px) { .pg-grid { grid-template-columns: 1fr; } }
+
+.pg-block { background: var(--card); padding: 12px 14px; }
+.pg-block h4 {
+  margin: 0 0 8px;
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.pg-note { margin: 0 0 8px; font-size: 11.5px; line-height: 1.55; color: var(--muted-foreground); }
+.pg-note b { color: var(--foreground); font-weight: 600; }
+.pg-chips { justify-content: flex-start; }
+
+.st-chip-done       { border-color: #22c55e55; color: #bbf7d0; }
+.st-chip-verified   { border-color: #0ea5e955; color: #bae6fd; }
+.st-chip-partial    { border-color: #f59e0b55; color: #fde68a; }
+.st-chip-unverified { border-color: #f43f5e55; color: #fecdd3; }
+.st-chip-decision   { border-color: #a855f755; color: #e9d5ff; }
+.st-chip-riskhigh   { border-color: #ef444455; color: #fecaca; }
+
+/* per-commit list */
+.pg-hist { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
+.pg-hist li {
+  display: grid;
+  grid-template-columns: 56px minmax(60px, 1fr) 46px 52px minmax(0, 1.6fr);
+  align-items: center; gap: 8px;
+  font-size: 11px;
+}
+.pg-hist li.is-working { color: #fde68a; }
+.pg-sha { font-family: ui-monospace, monospace; font-size: 10.5px; color: var(--muted-foreground); }
+.pg-bar { height: 5px; border-radius: 999px; background: var(--muted); overflow: hidden; }
+.pg-bar span { display: block; height: 100%; background: #52525b; border-radius: 999px; }
+.pg-hist li.is-working .pg-bar span { background: #84cc16; }
+.pg-hist-pct { font-variant-numeric: tabular-nums; text-align: right; color: var(--foreground); }
+.pg-hist-delta {
+  font-variant-numeric: tabular-nums; text-align: right;
+  color: var(--muted-foreground);
+}
+.pg-hist-delta.up { color: #86efac; }
+.pg-hist-delta.down { color: #fca5a5; }
+.pg-hist-subject {
+  color: var(--muted-foreground);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* next steps */
+.pg-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; counter-reset: s; }
+.pg-steps li { display: flex; gap: 9px; align-items: flex-start; font-size: 12px; }
+.pg-step-n {
+  flex: 0 0 18px; height: 18px;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  background: #052e16; border: 1px solid #84cc16;
+  color: #d9f99d;
+  font-size: 10px; font-weight: 600;
+}
+.pg-steps b { font-weight: 600; }
+.pg-step-detail { display: block; color: var(--muted-foreground); font-size: 11px; margin-top: 1px; }
 
 .sidebar {
   width: 292px;
@@ -266,6 +400,117 @@ kbd {
   white-space: nowrap;
 }
 .chip b { color: var(--foreground); font-weight: 600; }
+
+/* ---------------------------------------------------------------- outline
+   The text view. No transforms anywhere in here — it is ordinary scrolling text, which is
+   why it stays sharp, selectable and searchable. */
+.outline {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+  scroll-behavior: smooth;
+}
+
+.ol-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  background: var(--card-2);
+  overflow: hidden;
+  scroll-margin-top: 8px;
+}
+.ol-section.active { border-color: var(--ring); }
+.ol-section.hidden { display: none; }
+
+.ol-head {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  background: transparent;
+  border: 0; border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  font: inherit; font-size: 11.5px; font-weight: 600;
+  letter-spacing: .03em;
+  text-align: left; cursor: pointer;
+}
+.ol-head:hover { background: var(--muted); }
+.ol-caret { color: var(--muted-foreground); transition: transform .15s; }
+.ol-head-title { flex: 1; }
+.ol-head-count {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  font-family: ui-monospace, monospace;
+  font-size: 10.5px;
+}
+.ol-section.collapsed .ol-caret { transform: rotate(-90deg); }
+.ol-section.collapsed .ol-body { display: none; }
+.ol-section.collapsed .ol-head { border-bottom: 0; }
+
+.ol-body { padding: 4px 0 6px; }
+
+.ol-row {
+  display: flex; align-items: flex-start; gap: 7px;
+  padding: 3px 10px 3px calc(10px + var(--depth) * 18px);
+  border-left: 2px solid transparent;
+  line-height: 1.45;
+}
+.ol-row:hover { background: #ffffff06; }
+.ol-row.hidden { display: none; }
+
+/* indent guide */
+.ol-rail {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 0;
+  border-left: 1px solid var(--border);
+  margin-right: 3px;
+  display: none;
+}
+.ol-row:not([style*="--depth: 0"]) .ol-rail { display: block; }
+
+.ol-dot {
+  flex: 0 0 15px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+.ol-text { display: flex; flex-direction: column; min-width: 0; }
+.ol-first { font-size: 12.5px; color: var(--foreground); }
+.ol-cont { font-size: 11.5px; color: var(--muted-foreground); }
+
+/* status colour, applied to the glyph and the left rule — never colour alone */
+.st-done      { border-left-color: #22c55e; } .st-done      .ol-dot { color: #22c55e; }
+.st-partial   { border-left-color: #f59e0b; } .st-partial   .ol-dot { color: #f59e0b; }
+.st-todo      { border-left-color: #3f3f46; } .st-todo      .ol-dot { color: #71717a; }
+.st-verified  { border-left-color: #0ea5e9; } .st-verified  .ol-dot { color: #0ea5e9; }
+.st-unverified{ border-left-color: #f43f5e; } .st-unverified .ol-dot { color: #f43f5e; }
+.st-decision  { border-left-color: #a855f7; } .st-decision  .ol-dot { color: #a855f7; }
+.st-branch    { border-left-color: #818cf8; } .st-branch    .ol-dot { color: #818cf8; }
+.st-riskhigh  { border-left-color: #ef4444; } .st-riskhigh  .ol-dot { color: #ef4444; }
+.st-next      { border-left-color: #84cc16; } .st-next      .ol-dot { color: #84cc16; }
+
+.st-riskhigh .ol-first, .st-next .ol-first { font-weight: 600; }
+
+/* search box */
+.search-wrap { padding: 8px 10px; }
+.search {
+  width: 100%;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+  color: var(--foreground);
+  font: inherit; font-size: 12px;
+}
+.search:focus { outline: none; border-color: var(--ring); }
+
+/* mode visibility — one switch, both panes */
+.mode-outline .viewport,
+.mode-diagram .outline { display: none; }
+body:has(.stage.mode-outline) .only-diagram,
+body:has(.stage.mode-diagram) .only-outline { display: none; }
 
 .viewport {
   flex: 1;

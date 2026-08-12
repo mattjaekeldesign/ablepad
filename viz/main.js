@@ -1,24 +1,27 @@
 /**
- * viz/main.js — the only JavaScript in this project.
+ * viz/main.js — the viewer's controller.
  *
- * Why it exists : renders the projected and master trees, and makes them navigable
- *                 section by section so the roadmap can be read in steps.
- * Layer it owns : presentation only. Knows nothing about MIDI, Ableton or the rig.
- * Who calls it  : viz/index.html via `npm run dev`.
- * What it returns: nothing — it mutates the DOM.
+ * Why it exists : wires the two trees to two reading modes, a section navigator and a
+ *                 position memory that survives a reload.
+ * Layer it owns : behaviour. Content is trees.js, structure is parse.js, text view is
+ *                 outline.js, diagram is mermaid. This file owns none of those.
+ * Who calls it  : viz/index.html.
  *
- * Content lives in viz/trees/*.mmd. Sections in the sidebar are DERIVED from the
- * `subgraph` blocks in those files, so adding a section is a .mmd edit, never a JS edit.
+ * Two reading modes, because they are good at different things:
+ *   OUTLINE (default) — indented text. Scroll, search, select, copy. No zoom, no blur.
+ *   DIAGRAM           — mermaid SVG. Shows the branching shape; needs zoom and pan.
+ *
+ * Position is persisted to sessionStorage on every change. A reload — from editing main.js,
+ * from a vite restart, from anything — lands you back on the same section, scroll and zoom.
  */
 import mermaid from 'mermaid'
+import { trees, onTreesChange } from './trees.js'
+import { parseTree } from './parse.js'
+import { createOutline } from './outline.js'
+import { createProgressBar } from './progressbar.js'
 
-// Eager raw glob → Vite treats the .mmd files as module deps → saving one hot-reloads.
-const SOURCES = import.meta.glob('./trees/*.mmd', { query: '?raw', import: 'default', eager: true })
-
-const TREES = {
-  projected: { src: SOURCES['./trees/projected.mmd'], label: 'Plan' },
-  master: { src: SOURCES['./trees/master.mmd'], label: 'Truth' },
-}
+const NAMES = ['projected', 'master']
+const TREE_LABEL = { projected: 'Plan', master: 'Truth' }
 
 const STATUS_LABEL = {
   done: 'done',
@@ -48,99 +51,72 @@ mermaid.initialize({
   },
 })
 
-/* ═════════════════════════════════════════════════════ parse the .mmd source */
+/* ════════════════════════════════════════════════════════ persisted position */
 
-/** Sections are the `subgraph ID["Title"]` blocks. Order in the file = order in the UI. */
-function parseSections(src) {
-  const out = []
-  const re = /^\s*subgraph\s+([A-Za-z0-9_]+)\s*\[\s*"([^"]+)"\s*\]/gm
-  let m
-  while ((m = re.exec(src))) out.push({ id: m[1], title: m[2] })
-  return out
+const STATE_KEY = 'ablepad.viz.state'
+
+const state = {
+  view: 'split',
+  mode: 'outline',
+  layout: 'tall',
+  sidebar: true,
+  cursor: -1,
+  search: '',
+  panes: { projected: { x: 0, y: 0, k: 1, scroll: 0 }, master: { x: 0, y: 0, k: 1, scroll: 0 } },
+  ...safeLoad(),
 }
 
-/** Status chips in each pane header — counted straight from the `:::class` suffixes. */
-function countStatuses(src) {
-  const counts = {}
-  for (const m of src.matchAll(/:::([a-z]+)/g)) {
-    if (m[1] in STATUS_LABEL) counts[m[1]] = (counts[m[1]] ?? 0) + 1
+function safeLoad() {
+  try {
+    return JSON.parse(sessionStorage.getItem(STATE_KEY) ?? '{}')
+  } catch {
+    return {} // a corrupt blob must never stop the page from opening
   }
-  return counts
 }
 
-/* ═════════════════════════════════════════════════════════════════ rendering */
+let saveTimer = 0
+function save() {
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => sessionStorage.setItem(STATE_KEY, JSON.stringify(state)), 200)
+}
+window.addEventListener('pagehide', () => sessionStorage.setItem(STATE_KEY, JSON.stringify(state)))
 
-let renderToken = 0
+/* ═══════════════════════════════════════════════════════════════ diagram pane */
+
+const MIN_K = 0.25
+const MAX_K = 1.0
+const STEP = 1.12
+const WHEEL_GAIN = 0.0022
 
 /**
- * Layout is a VIEW concern, so it is rewritten here rather than edited into the .mmd files.
- * "tall"  → each section becomes a narrow vertical column; the doc stacks and stays readable.
- * "wide"  → the section's own `direction LR`; wide rows, good for an overview, hard to read.
+ * Zoom is applied as the SVG's layout SIZE, not as a CSS scale — a cached layer scaled 4x is
+ * blurry. Never add will-change/backface-visibility to .canvas; see style.css.
  */
-function sourceFor(name) {
-  const src = TREES[name].src ?? ''
-  return layout === 'tall' ? src.replace(/^(\s*)direction\s+LR\s*$/gm, '$1direction TB') : src
-}
-
-async function render(name) {
-  const canvas = document.getElementById(`canvas-${name}`)
-  const src = sourceFor(name)
-
-  if (!src) {
-    canvas.innerHTML = `<div class="error">Missing viz/trees/${name}.mmd</div>`
-    return
-  }
-
-  try {
-    const { svg } = await mermaid.render(`mmd-${name}-${renderToken++}`, src)
-    canvas.innerHTML = svg
-  } catch (err) {
-    // A .mmd syntax error must name its file. Silent blank panes waste hours.
-    canvas.innerHTML = `<div class="error">${name}.mmd failed to parse\n\n${err?.message ?? err}</div>`
-  }
-
-  // Re-read the SVG's intrinsic size — zoom is applied as element size, not as a CSS scale.
-  PANES[name]?.syncBase()
-
-  const chips = document.querySelector(`[data-chips="${name}"]`)
-  const counts = countStatuses(src)
-  chips.innerHTML = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, n]) => `<span class="chip"><b>${n}</b> ${STATUS_LABEL[k]}</span>`)
-    .join('')
-}
-
-/* ═══════════════════════════════════════════════════════ pan / zoom per pane */
-
-// 100% is now the SVG's intrinsic size — since zoom sets element size rather than CSS-scaling,
-// 100% renders at mermaid's own 15px type and is already readable. Hence the plain range.
-const MIN_K = 0.25 // floor: whole-tree overview
-const MAX_K = 1.0 // ceiling: native size
-const STEP = 1.12 // button/key step — ~12 clicks across the range
-const WHEEL_GAIN = 0.0022 // wheel/trackpad: continuous exponential zoom, no notches
-
-/** Dumb on purpose: no dependency, no inertia, no animation. One transform per pane. */
-function attachPanZoom(viewport, onZoom) {
+function attachPanZoom(viewport, memory, onZoom) {
   const canvas = viewport.querySelector('.canvas')
-  const t = { x: 0, y: 0, k: MAX_K }
-  /**
-   * One writer for the transform. `glide` turns on a CSS transition for deliberate jumps
-   * (section focus, fit, buttons); direct input — wheel and drag — must never animate or it
-   * feels like lag.
-   */
-  let glideTimer = 0
-
-  /**
-   * Zoom is applied as the SVG's own layout SIZE, not as a CSS scale.
-   *
-   * A CSS `scale()` on an SVG is a raster operation the moment the browser caches the layer —
-   * at 488% that is visibly blurry text. Resizing the element instead makes the browser lay the
-   * vectors out at the real size, so glyphs are drawn sharp at any zoom. The transform is left
-   * doing translation only. Geometry is unchanged: rendered size is still base * k, so every
-   * rect/t.k conversion below still holds.
-   */
+  const t = { x: memory.x ?? 0, y: memory.y ?? 0, k: memory.k ?? MAX_K }
   let baseW = 0
   let baseH = 0
+  let glideTimer = 0
+
+  const apply = (glide) => {
+    canvas.classList.toggle('glide', !!glide)
+    canvas.style.transform = `translate(${t.x}px,${t.y}px)`
+    const svg = canvas.querySelector('svg')
+    if (svg && baseW) {
+      svg.style.width = `${baseW * t.k}px`
+      svg.style.height = `${baseH * t.k}px`
+    }
+    memory.x = t.x
+    memory.y = t.y
+    memory.k = t.k
+    save()
+    onZoom?.(t.k)
+    if (glide) {
+      clearTimeout(glideTimer)
+      glideTimer = setTimeout(() => canvas.classList.remove('glide'), 340)
+    }
+  }
 
   function syncBase() {
     const svg = canvas.querySelector('svg')
@@ -152,22 +128,6 @@ function attachPanZoom(viewport, onZoom) {
     apply(false)
   }
 
-  const apply = (glide) => {
-    canvas.classList.toggle('glide', !!glide)
-    canvas.style.transform = `translate(${t.x}px,${t.y}px)`
-    const svg = canvas.querySelector('svg')
-    if (svg && baseW) {
-      svg.style.width = `${baseW * t.k}px`
-      svg.style.height = `${baseH * t.k}px`
-    }
-    onZoom?.(t.k)
-    if (glide) {
-      clearTimeout(glideTimer)
-      glideTimer = setTimeout(() => canvas.classList.remove('glide'), 340)
-    }
-  }
-
-  /** Zoom about a point in viewport coordinates. Defaults to the centre of the pane. */
   function zoomAt(factor, px, py, glide = true) {
     const r = viewport.getBoundingClientRect()
     const cx = px ?? r.width / 2
@@ -179,10 +139,8 @@ function attachPanZoom(viewport, onZoom) {
     apply(glide)
   }
 
-  // Wheel and trackpad are continuous — exponential in deltaY, so slow scrolls creep and fast
-  // scrolls travel. Coalesced into one write per frame so a trackpad flick cannot flood layout.
   let wheelDelta = 0
-  let wheelPos = null
+  let wheelPos = [0, 0]
   let wheelFrame = 0
   viewport.addEventListener(
     'wheel',
@@ -190,7 +148,7 @@ function attachPanZoom(viewport, onZoom) {
       e.preventDefault()
       const r = viewport.getBoundingClientRect()
       wheelPos = [e.clientX - r.left, e.clientY - r.top]
-      wheelDelta += e.ctrlKey ? e.deltaY * 4 : e.deltaY // ctrl+wheel is a pinch: coarser
+      wheelDelta += e.ctrlKey ? e.deltaY * 4 : e.deltaY
       if (wheelFrame) return
       wheelFrame = requestAnimationFrame(() => {
         wheelFrame = 0
@@ -202,7 +160,6 @@ function attachPanZoom(viewport, onZoom) {
     { passive: false },
   )
 
-  // Double-click any box to fill the pane with it. The fastest path to "I can read this".
   viewport.addEventListener('dblclick', (e) => {
     const box = e.target.closest('g.node, g.cluster')
     if (box) frame(box, MAX_K)
@@ -211,6 +168,7 @@ function attachPanZoom(viewport, onZoom) {
   let dragging = false
   let ox = 0
   let oy = 0
+  let dragFrame = 0
   viewport.addEventListener('pointerdown', (e) => {
     dragging = true
     ox = e.clientX - t.x
@@ -218,8 +176,6 @@ function attachPanZoom(viewport, onZoom) {
     viewport.classList.add('dragging')
     viewport.setPointerCapture(e.pointerId)
   })
-  // Pan writes at most once per frame. Pointer events can outrun the compositor on a trackpad.
-  let dragFrame = 0
   viewport.addEventListener('pointermove', (e) => {
     if (!dragging) return
     t.x = e.clientX - ox
@@ -237,12 +193,11 @@ function attachPanZoom(viewport, onZoom) {
   viewport.addEventListener('pointerup', stop)
   viewport.addEventListener('pointercancel', stop)
 
-  /** Frame an element that is already inside this canvas. Uses screen rects, no viewBox maths. */
   function frame(el, maxScale) {
     const vp = viewport.getBoundingClientRect()
     const r = el.getBoundingClientRect()
     if (!r.width || !r.height) return
-    const x = (r.left - vp.left - t.x) / t.k // element position in canvas space at scale 1
+    const x = (r.left - vp.left - t.x) / t.k
     const y = (r.top - vp.top - t.y) / t.k
     const w = r.width / t.k
     const h = r.height / t.k
@@ -251,7 +206,7 @@ function attachPanZoom(viewport, onZoom) {
     t.k = Math.min(MAX_K, Math.max(MIN_K, k))
     t.x = (vp.width - w * t.k) / 2 - x * t.k
     t.y = (vp.height - h * t.k) / 2 - y * t.k
-    apply(true) // deliberate jump — glide to it
+    apply(true)
   }
 
   const clearFocus = () => {
@@ -260,27 +215,24 @@ function attachPanZoom(viewport, onZoom) {
   }
 
   return {
-    canvas,
-    zoomAt,
     syncBase,
-    scale: () => t.k,
+    zoomAt,
     reset() {
       t.x = 0
       t.y = 0
-      t.k = MAX_K // 100% — native size
+      t.k = MAX_K
       apply(true)
       clearFocus()
     },
     fit() {
       const svg = canvas.querySelector('svg')
-      if (svg) frame(svg, MAX_K) // clamps at the 25% floor on the biggest trees
+      if (svg) frame(svg, MAX_K)
       clearFocus()
     },
     focus(sectionId, title) {
       const svg = canvas.querySelector('svg')
       if (!svg) return false
-      // Mermaid ids each cluster "<diagramId>-<subgraphId>", e.g. "mmd-master-3-MF".
-      // Verified against a headless render of mermaid 11. Title match is the fallback.
+      // Mermaid ids clusters "<diagramId>-<subgraphId>". Title text is the fallback.
       const clusters = [...svg.querySelectorAll('g.cluster')]
       const el =
         clusters.find((c) => c.id === sectionId || c.id.endsWith(`-${sectionId}`)) ??
@@ -294,180 +246,292 @@ function attachPanZoom(viewport, onZoom) {
   }
 }
 
-/** Wire each pane to its own zoom readout so the two panes never share a number. */
-function makePane(name) {
-  const label = document.querySelector(`[data-zoom="${name}"] .zlabel`)
-  const pane = attachPanZoom(
+/* ═══════════════════════════════════════════════════════════════════ panes */
+
+/** One pane = one tree, one parsed model, one outline, one diagram. */
+const panes = {}
+
+for (const name of NAMES) {
+  const zoomLabel = document.querySelector(`[data-zoom="${name}"] .zlabel`)
+  const memory = (state.panes[name] ??= { x: 0, y: 0, k: MAX_K, scroll: 0 })
+  const pz = attachPanZoom(
     document.querySelector(`.pane[data-pane="${name}"] .viewport`),
-    (k) => (label.textContent = `${Math.round(k * 100)}%`),
+    memory,
+    (k) => (zoomLabel.textContent = `${Math.round(k * 100)}%`),
   )
   document.querySelectorAll(`[data-zoom="${name}"] .zbtn`).forEach((b) => {
-    b.addEventListener('click', () => pane.zoomAt(b.dataset.zdir === 'in' ? STEP : 1 / STEP))
+    b.addEventListener('click', () => pz.zoomAt(b.dataset.zdir === 'in' ? STEP : 1 / STEP))
   })
-  return pane
+
+  const host = document.getElementById(`outline-${name}`)
+  host.addEventListener('scroll', () => {
+    memory.scroll = host.scrollTop
+    save()
+  })
+
+  panes[name] = { name, pz, host, memory, model: null, outline: null, diagramSource: null }
 }
 
-const PANES = { projected: makePane('projected'), master: makePane('master') }
+/* ════════════════════════════════════════════════════════════════ rendering */
 
-/* ═══════════════════════════════════════════════════════════ section navigator */
+/** Layout is a view concern, so Tall is a rewrite here, not an edit to the .mmd files. */
+function sourceFor(name) {
+  const src = trees[name] ?? ''
+  return state.layout === 'tall' ? src.replace(/^(\s*)direction\s+LR\s*$/gm, '$1direction TB') : src
+}
+
+function renderOutline(name) {
+  const pane = panes[name]
+  pane.model = parseTree(trees[name] ?? '')
+  pane.outline = createOutline(pane.host, pane.model, name)
+  if (state.search) pane.outline.filter(state.search)
+  pane.host.scrollTop = pane.memory.scroll ?? 0
+
+  const chips = document.querySelector(`[data-chips="${name}"]`)
+  chips.innerHTML = Object.entries(pane.model.counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `<span class="chip"><b>${n}</b> ${STATUS_LABEL[k] ?? k}</span>`)
+    .join('')
+}
+
+let renderToken = 0
+
+/** The diagram is rendered lazily — it costs ~130 SVG nodes, and outline is the default mode. */
+async function renderDiagram(name, force = false) {
+  const pane = panes[name]
+  const src = sourceFor(name)
+  if (!force && pane.diagramSource === src) return
+  pane.diagramSource = src
+
+  const canvas = document.getElementById(`canvas-${name}`)
+  try {
+    const { svg } = await mermaid.render(`mmd-${name}-${renderToken++}`, src)
+    canvas.innerHTML = svg
+  } catch (err) {
+    canvas.innerHTML = `<div class="error">${name}.mmd failed to parse\n\n${err?.message ?? err}</div>`
+  }
+  pane.pz.syncBase()
+}
+
+/* ═══════════════════════════════════════════════════════ section navigator */
 
 const listEl = document.getElementById('section-list')
 const countEl = document.getElementById('section-count')
 const stepLabel = document.getElementById('step-label')
 
-let flatSections = [] // [{ tree, id, title }] — the walkable order for the stepper
-let cursor = -1
+let flatSections = []
 
-function visibleTrees() {
-  if (view === 'split') return ['projected', 'master']
-  return [view]
-}
+const visibleTrees = () => (state.view === 'split' ? NAMES : [state.view])
 
 function buildSectionList() {
   flatSections = []
   listEl.innerHTML = ''
 
-  for (const tree of visibleTrees()) {
-    const sections = parseSections(TREES[tree].src ?? '')
+  for (const name of visibleTrees()) {
+    const sections = panes[name].model?.sections ?? []
     const group = document.createElement('div')
     group.className = 'section-group'
-    group.textContent = TREES[tree].label
+    group.textContent = TREE_LABEL[name]
     listEl.append(group)
 
     sections.forEach((s) => {
       const i = flatSections.length
-      flatSections.push({ tree, ...s })
+      flatSections.push({ tree: name, id: s.id, title: s.title })
 
+      const [head, ...rest] = s.title.split(/\s+—\s+/)
       const btn = document.createElement('button')
       btn.className = 'section-item'
       btn.dataset.index = String(i)
-      // Titles read "PHASE 3 — LAUNCHPAD SERVICE · Risk MEDIUM"; split off the head as the index chip.
-      const [head, ...rest] = s.title.split(/\s+—\s+/)
+      btn.title = s.title
       btn.innerHTML =
         `<span class="idx">${head.replace(/PHASE\s*/i, 'P').replace(/\s+/g, '')}</span>` +
         `<span class="label">${rest.join(' — ') || s.title}</span>`
-      btn.title = s.title
       btn.addEventListener('click', () => goTo(i))
       listEl.append(btn)
     })
   }
 
-  countEl.textContent = `${flatSections.length}`
-  cursor = -1
+  countEl.textContent = String(flatSections.length)
+  if (state.cursor >= flatSections.length) state.cursor = -1
+  markActive()
   updateStepper()
 }
 
-function goTo(i) {
-  if (!flatSections.length) return
-  cursor = (i + flatSections.length) % flatSections.length
-  const s = flatSections[cursor]
-  const ok = PANES[s.tree].focus(s.id, s.title)
-  // The other pane stays put — comparing while one side is zoomed is the point.
+function markActive() {
   listEl.querySelectorAll('.section-item').forEach((b) => {
-    b.classList.toggle('active', Number(b.dataset.index) === cursor)
+    b.classList.toggle('active', Number(b.dataset.index) === state.cursor)
   })
-  listEl.querySelector('.section-item.active')?.scrollIntoView({ block: 'nearest' })
-  updateStepper(ok ? null : 'section not found in the rendered SVG')
+}
+
+function goTo(i, { scroll = true } = {}) {
+  if (!flatSections.length) return
+  state.cursor = (i + flatSections.length) % flatSections.length
+  const s = flatSections[state.cursor]
+  const pane = panes[s.tree]
+  const ok = state.mode === 'outline' ? pane.outline?.scrollToSection(s.id) : pane.pz.focus(s.id, s.title)
+  markActive()
+  if (scroll) listEl.querySelector('.section-item.active')?.scrollIntoView({ block: 'nearest' })
+  updateStepper(ok === false ? 'section not found in this view' : null)
+  save()
 }
 
 function updateStepper(warning) {
-  if (cursor < 0) {
-    stepLabel.textContent = flatSections.length
-      ? `${flatSections.length} sections · pick one to start`
-      : 'no sections found'
+  if (state.cursor < 0) {
+    stepLabel.textContent = flatSections.length ? `${flatSections.length} sections` : 'no sections found'
     stepLabel.classList.add('muted')
     return
   }
-  const s = flatSections[cursor]
+  const s = flatSections[state.cursor]
   stepLabel.classList.remove('muted')
   stepLabel.textContent = warning
-    ? `${cursor + 1}/${flatSections.length} — ${warning}`
-    : `${cursor + 1}/${flatSections.length} · ${TREES[s.tree].label} · ${s.title}`
+    ? `${state.cursor + 1}/${flatSections.length} — ${warning}`
+    : `${state.cursor + 1}/${flatSections.length} · ${TREE_LABEL[s.tree]} · ${s.title}`
 }
 
-document.getElementById('next').addEventListener('click', () => goTo(cursor + 1))
-document.getElementById('prev').addEventListener('click', () => goTo(cursor - 1))
+document.getElementById('next').addEventListener('click', () => goTo(state.cursor + 1))
+document.getElementById('prev').addEventListener('click', () => goTo(state.cursor - 1))
 
-/* ════════════════════════════════════════════════════════════════ view state */
+/* ══════════════════════════════════════════════════════════════ view state */
 
 const stage = document.getElementById('stage')
 const shell = document.querySelector('.shell')
-const VIEW_KEY = 'ablepad.viz.view'
-const SIDEBAR_KEY = 'ablepad.viz.sidebar'
-const LAYOUT_KEY = 'ablepad.viz.layout'
 
-let view = 'split'
-let layout = 'tall'
+function paintStage() {
+  stage.className = `stage view-${state.view} mode-${state.mode}`
+  syncTabs('view', 'view', state.view)
+  syncTabs('mode', 'mode', state.mode)
+  syncTabs('layout', 'layout', state.layout)
+  shell.classList.toggle('no-sidebar', !state.sidebar)
+}
 
-function setView(next) {
-  view = next
-  stage.className = `stage view-${view}`
+function syncTabs(group, attr, value) {
   document
-    .querySelectorAll('.tabs:not(.small) .tab')
-    .forEach((b) => b.classList.toggle('active', b.dataset.view === view))
-  localStorage.setItem(VIEW_KEY, view)
+    .querySelectorAll(`.tabs[data-group="${group}"] .tab`)
+    .forEach((b) => b.classList.toggle('active', b.dataset[attr] === value))
+}
+
+async function setView(view) {
+  state.view = view
+  paintStage()
   buildSectionList()
-  // Land on the first section, not on a fit-to-everything view — fit is unreadable on
-  // a 130-node tree, and "I can't read it" is the first thing that kills a diagram.
-  requestAnimationFrame(() => goTo(0))
+  if (state.mode === 'diagram') await Promise.all(visibleTrees().map((n) => renderDiagram(n)))
+  save()
 }
 
-document
-  .querySelectorAll('.tabs:not(.small) .tab')
-  .forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)))
-
-/** Re-render both trees under a new layout, then return to the section you were on. */
-async function setLayout(next) {
-  layout = next
-  localStorage.setItem(LAYOUT_KEY, layout)
-  document
-    .querySelectorAll('.tabs.small .tab')
-    .forEach((b) => b.classList.toggle('active', b.dataset.layout === layout))
-  const at = cursor
-  await Promise.all([render('projected'), render('master')])
-  requestAnimationFrame(() => goTo(at < 0 ? 0 : at))
+async function setMode(mode) {
+  state.mode = mode
+  paintStage()
+  if (mode === 'diagram') {
+    await Promise.all(visibleTrees().map((n) => renderDiagram(n)))
+    // Restoring a section beats restoring a transform: the tree may have re-laid out.
+    if (state.cursor >= 0) requestAnimationFrame(() => goTo(state.cursor, { scroll: false }))
+  } else if (state.cursor >= 0) {
+    goTo(state.cursor, { scroll: false })
+  }
+  save()
 }
 
-document
-  .querySelectorAll('.tabs.small .tab')
-  .forEach((b) => b.addEventListener('click', () => setLayout(b.dataset.layout)))
-
-function setSidebar(hidden) {
-  shell.classList.toggle('no-sidebar', hidden)
-  localStorage.setItem(SIDEBAR_KEY, hidden ? '1' : '0')
-  requestAnimationFrame(() => Object.values(PANES).forEach((p) => p.fit()))
+async function setLayout(layout) {
+  state.layout = layout
+  paintStage()
+  await Promise.all(visibleTrees().map((n) => renderDiagram(n, true)))
+  if (state.cursor >= 0) requestAnimationFrame(() => goTo(state.cursor, { scroll: false }))
+  save()
 }
 
-document.getElementById('sidebar-toggle').addEventListener('click', () =>
-  setSidebar(!shell.classList.contains('no-sidebar')),
-)
-document.getElementById('fit').addEventListener('click', () => Object.values(PANES).forEach((p) => p.fit()))
+function setSidebar(on) {
+  state.sidebar = on
+  paintStage()
+  save()
+}
 
-/** Keyboard zoom hits the visible panes only, so Plan/Truth views behave as expected. */
-const zoomVisible = (f) => visibleTrees().forEach((t) => PANES[t].zoomAt(f))
+document.querySelectorAll('.tabs[data-group="view"] .tab').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)))
+document.querySelectorAll('.tabs[data-group="mode"] .tab').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)))
+document.querySelectorAll('.tabs[data-group="layout"] .tab').forEach((b) => b.addEventListener('click', () => setLayout(b.dataset.layout)))
+document.getElementById('sidebar-toggle').addEventListener('click', () => setSidebar(!state.sidebar))
+document.getElementById('fit').addEventListener('click', () => visibleTrees().forEach((n) => panes[n].pz.fit()))
 
-window.addEventListener('keydown', (e) => {
-  if (e.metaKey || e.ctrlKey || e.altKey) return
-  const views = { 1: 'projected', 2: 'master', 3: 'split' }
-  const k = e.key.toLowerCase()
-  if (views[e.key]) setView(views[e.key])
-  else if (k === 'j') goTo(cursor + 1)
-  else if (k === 'k') goTo(cursor - 1)
-  else if (k === 'f') Object.values(PANES).forEach((p) => p.fit())
-  else if (k === 'l') setLayout(layout === 'tall' ? 'wide' : 'tall')
-  else if (e.key === '+' || e.key === '=') zoomVisible(STEP)
-  else if (e.key === '-' || e.key === '_') zoomVisible(1 / STEP)
-  else if (e.key === '0') Object.values(PANES).forEach((p) => p.reset())
-  else if (k === 's') setSidebar(!shell.classList.contains('no-sidebar'))
+let allCollapsed = false
+document.getElementById('collapse').addEventListener('click', () => {
+  allCollapsed = !allCollapsed
+  NAMES.forEach((n) => panes[n].outline?.setCollapsed(allCollapsed))
+  document.getElementById('collapse').textContent = allCollapsed ? 'Expand' : 'Collapse'
 })
 
-/* ══════════════════════════════════════════════════════════════════════ boot */
+/* ═════════════════════════════════════════════════════════════════ search */
 
-layout = localStorage.getItem(LAYOUT_KEY) ?? 'tall'
-document
-  .querySelectorAll('.tabs.small .tab')
-  .forEach((b) => b.classList.toggle('active', b.dataset.layout === layout))
+const searchEl = document.getElementById('search')
+const hitEl = document.getElementById('hit-count')
 
-setSidebar(localStorage.getItem(SIDEBAR_KEY) === '1')
-await Promise.all([render('projected'), render('master')])
-setView(localStorage.getItem(VIEW_KEY) ?? 'split')
+searchEl.value = state.search ?? ''
+searchEl.addEventListener('input', () => {
+  state.search = searchEl.value
+  const hits = visibleTrees().reduce((n, name) => n + (panes[name].outline?.filter(state.search) ?? 0), 0)
+  hitEl.textContent = state.search ? `${hits} rows` : ''
+  if (state.search && state.mode !== 'outline') setMode('outline') // search is an outline feature
+  save()
+})
+
+/* ═════════════════════════════════════════════════════════════ keyboard */
+
+window.addEventListener('keydown', (e) => {
+  const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement
+  if (typing) {
+    if (e.key === 'Escape') {
+      searchEl.value = ''
+      searchEl.dispatchEvent(new Event('input'))
+      searchEl.blur()
+    }
+    return
+  }
+  if (e.metaKey || e.ctrlKey || e.altKey) return
+
+  const k = e.key.toLowerCase()
+  const views = { 1: 'projected', 2: 'master', 3: 'split' }
+  if (e.key === '/') {
+    e.preventDefault()
+    searchEl.focus()
+  } else if (views[e.key]) setView(views[e.key])
+  else if (k === 'm') setMode(state.mode === 'outline' ? 'diagram' : 'outline')
+  else if (k === 'j') goTo(state.cursor + 1)
+  else if (k === 'k') goTo(state.cursor - 1)
+  else if (k === 'c') document.getElementById('collapse').click()
+  else if (k === 'l') setLayout(state.layout === 'tall' ? 'wide' : 'tall')
+  else if (k === 'f') visibleTrees().forEach((n) => panes[n].pz.fit())
+  else if (e.key === '0') visibleTrees().forEach((n) => panes[n].pz.reset())
+  else if (e.key === '+' || e.key === '=') visibleTrees().forEach((n) => panes[n].pz.zoomAt(STEP))
+  else if (e.key === '-' || e.key === '_') visibleTrees().forEach((n) => panes[n].pz.zoomAt(1 / STEP))
+  else if (k === 's') setSidebar(!state.sidebar)
+})
+
+/* ══════════════════════════════════════════ hot content swap, without reload */
+
+onTreesChange(() => {
+  const at = state.cursor
+  progress.refresh(trees) // the score moves the moment a status class changes
+  NAMES.forEach((n) => {
+    renderOutline(n)
+    panes[n].diagramSource = null // force a re-render next time the diagram is shown
+  })
+  buildSectionList()
+  if (state.mode === 'diagram') {
+    Promise.all(visibleTrees().map((n) => renderDiagram(n, true))).then(() => {
+      if (at >= 0) goTo(at, { scroll: false })
+    })
+  } else if (at >= 0) {
+    goTo(at, { scroll: false })
+  }
+  document.getElementById('foot-hint').textContent = 'trees reloaded from disk — position kept'
+})
+
+/* ══════════════════════════════════════════════════════════════════ boot */
+
+const progress = createProgressBar(document.getElementById('progress-strip'))
+progress.refresh(trees)
+
+paintStage()
+NAMES.forEach(renderOutline)
+buildSectionList()
+if (state.mode === 'diagram') await Promise.all(visibleTrees().map((n) => renderDiagram(n)))
+if (state.cursor >= 0) goTo(state.cursor)
+if (state.search) hitEl.textContent = `${visibleTrees().reduce((n, name) => n + (panes[name].outline?.filter(state.search) ?? 0), 0)} rows`

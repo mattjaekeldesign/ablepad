@@ -10,11 +10,12 @@
  * Boot order matters: palette before any LED paint, library before any configRef
  * dropdown, then panels, then open the first config so every panel starts populated.
  */
-import { store, loadLibrary, openConfig, saveConfig, selectPad, setSim } from './store.js'
+import { store, loadLibrary, loadAnimLibrary, openConfig, saveAll, anyDirty, selectPad, setSim } from './store.js'
 import { loadPalette } from './palette.js'
 import { initLibrary } from './library.js'
 import { initGrid } from './grid.js'
 import { initFlow } from './flow.js'
+import { initAnimEditor } from './animeditor.js'
 import { initInspector } from './inspector.js'
 
 /* ══════════════════════════════════════════════════════════════════ view tabs */
@@ -22,6 +23,7 @@ import { initInspector } from './inspector.js'
 const stages = {
   grid: document.getElementById('stage-grid'),
   flow: document.getElementById('stage-flow'),
+  anim: document.getElementById('stage-anim'),
 }
 let view = 'grid'
 
@@ -52,16 +54,19 @@ store.on('sim:changed', (on) => {
 
 const saveBtn = document.getElementById('save')
 const dirtyFlag = document.getElementById('dirty-flag')
-saveBtn.addEventListener('click', () => saveConfig())
-store.on('dirty:changed', (dirty) => {
-  dirtyFlag.hidden = !dirty
-  saveBtn.disabled = !dirty
-})
+saveBtn.addEventListener('click', () => saveAll())
+// Two dirty flags (config + animation), one topbar affordance: dirty means "anything".
+function refreshDirtyUi() {
+  dirtyFlag.hidden = !anyDirty()
+  saveBtn.disabled = !anyDirty()
+}
+store.on('dirty:changed', refreshDirtyUi)
+store.on('animdirty:changed', refreshDirtyUi)
 saveBtn.disabled = true
 
 // Unsaved edits are working memory only — losing them to a stray ⌘W costs a session.
 window.addEventListener('beforeunload', (e) => {
-  if (store.state.dirty) e.preventDefault()
+  if (anyDirty()) e.preventDefault()
 })
 
 /* ═══════════════════════════════════════════════════════════════════ keyboard */
@@ -70,7 +75,7 @@ window.addEventListener('keydown', (e) => {
   const typing = /^(input|textarea|select)$/i.test(document.activeElement?.tagName ?? '')
   if ((e.metaKey || e.ctrlKey) && e.key === 's') {
     e.preventDefault() // browser save dialog is never what anyone wants here
-    saveConfig()
+    saveAll()
     return
   }
   if (typing || e.metaKey || e.ctrlKey || e.altKey) return
@@ -80,6 +85,7 @@ window.addEventListener('keydown', (e) => {
     setSim(!store.state.sim)
   } else if (e.key === '1') setView('grid')
   else if (e.key === '2') setView('flow')
+  else if (e.key === '3') setView('anim')
 })
 
 /* ═══════════════════════════════════════════════════════════════════ toasts */
@@ -99,6 +105,7 @@ store.on('toast', ({ kind, text }) => {
 await loadPalette()
 try {
   await loadLibrary()
+  await loadAnimLibrary()
 } catch (err) {
   store.emit('toast', { kind: 'error', text: `library load failed: ${err.message}` })
 }
@@ -106,6 +113,7 @@ try {
 initLibrary(document.getElementById('library'))
 initGrid(stages.grid)
 initFlow(stages.flow)
+initAnimEditor(stages.anim)
 initInspector(document.getElementById('inspector'))
 
 // Open something real on first load: boot mode if present, else the first config.

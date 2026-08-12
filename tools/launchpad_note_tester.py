@@ -62,20 +62,35 @@ FRAME_INDICES: tuple[int, ...] = tuple(
     i for i in ALL_LED_INDICES if i not in PAD_GRID_INDICES
 )
 
+# LED index 99 is the Novation logo. It LIGHTS but it is not a button -- confirmed on
+# the hardware 2026-08-12. Waiting for a press there is waiting forever, so the sweep
+# lights it (which does prove it is addressable) and records it as LED-only.
+LED_ONLY_INDICES: frozenset[int] = frozenset({99})
+
+# Per-position patience. Long enough to find the pad, short enough that a whole
+# 81-position sweep cannot run away if nobody is at the device.
+PRESS_TIMEOUT_S = 25.0
+
 
 @dataclass
 class Observation:
     led_index: int
-    message_type: str  # "note_on" | "control_change" | "none"
+    message_type: str  # "note_on" | "control_change" | "led-only" | "none"
     number: int | None
     velocity: int | None
 
     @property
+    def sent_something(self) -> bool:
+        return self.message_type in ("note_on", "control_change")
+
+    @property
     def agrees(self) -> bool:
         """Does the input number match the LED index we lit?"""
-        return self.number == self.led_index
+        return self.sent_something and self.number == self.led_index
 
     def describe(self) -> str:
+        if self.message_type == "led-only":
+            return f"  LED {self.led_index:>2} -> lights, but there is no button under it"
         if self.message_type == "none":
             return f"  LED {self.led_index:>2} -> (nothing captured)"
         kind = "note" if self.message_type == "note_on" else "CC  "
@@ -95,15 +110,24 @@ def sweep(session, indices: tuple[int, ...], observations: list[Observation]) ->
     """
     total = len(indices)
 
-    print(f"\n  {total} positions. Press the LIT control each time.")
-    print("  Press Enter with nothing lit-and-pressed to skip a position.")
-    print("  Ctrl+C stops early and still saves what you have.\n")
+    print(f"\n  {total} positions. ONE control lights at a time -- press the lit one.")
+    print("  The LIGHT is the prompt; you do not need to watch this terminal.")
+    print(f"  A position you cannot press times out after {PRESS_TIMEOUT_S:.0f}s and moves on.")
+    print("  Ctrl+C stops early and still saves everything captured so far.\n")
 
     for count, index in enumerate(indices, start=1):
         session.send(led_static(index, CUE_COLOUR))
-        print(f"  [{count}/{total}] lit LED index {index} -- press it", end="", flush=True)
 
-        message = session.wait_for_event(timeout_s=30.0)
+        if index in LED_ONLY_INDICES:
+            # Lighting it is the whole test: it proves the index is addressable.
+            # There is no button under it, so do not stall waiting for one.
+            print(f"  [{count}/{total}] LED {index} lit -- LED-only, no button, not waited on")
+            session.send(led_static(index, 0))
+            observations.append(Observation(index, "led-only", None, None))
+            continue
+
+        print(f"  [{count}/{total}] lit LED index {index} -- press it", end="", flush=True)
+        message = session.wait_for_event(timeout_s=PRESS_TIMEOUT_S)
         session.send(led_static(index, 0))
 
         if message is None:
@@ -150,13 +174,15 @@ def free_capture(session, rec: Recorder) -> None:
 
 
 def analyse(rec: Recorder, observations: list[Observation]) -> None:
-    captured = [o for o in observations if o.message_type != "none"]
+    captured = [o for o in observations if o.sent_something]
+    led_only = [o for o in observations if o.message_type == "led-only"]
     skipped = [o for o in observations if o.message_type == "none"]
     mismatched = [o for o in captured if not o.agrees]
 
     rec.add("# --- ANALYSIS ---")
     rec.add(f"#   positions swept:  {len(observations)}")
     rec.add(f"#   captured:         {len(captured)}")
+    rec.add(f"#   LED-only (no button under it): {len(led_only)}")
     rec.add(f"#   skipped/timeout:  {len(skipped)}")
     rec.add(f"#   index mismatches: {len(mismatched)}")
     rec.add()
@@ -176,10 +202,10 @@ def analyse(rec: Recorder, observations: list[Observation]) -> None:
     rec.add(f"#   sends CC   ({len(ccs)}): {ccs}")
     rec.add()
 
-    expected_cc = sorted(FRAME_INDICES)
+    expected_cc = sorted(i for i in FRAME_INDICES if i not in LED_ONLY_INDICES)
     if ccs and ccs == expected_cc:
         rec.add("#   The CC frame matches the inferred layout exactly:")
-        rec.add("#     top row 91-98, right column 19..89, logo 99.")
+        rec.add("#     top row 91-98, right column 19..89 (logo 99 lights only).")
         rec.add("#   This was the main open question. Consider it closed.")
     elif ccs:
         rec.add("#   CC frame does NOT match the inferred layout.")
@@ -190,7 +216,7 @@ def analyse(rec: Recorder, observations: list[Observation]) -> None:
 
 
 def emit_literal(rec: Recorder, observations: list[Observation]) -> None:
-    captured = [o for o in observations if o.message_type != "none"]
+    captured = [o for o in observations if o.sent_something]
     if not captured:
         rec.add("# Nothing captured -- no literal emitted.")
         return
@@ -218,6 +244,11 @@ def emit_literal(rec: Recorder, observations: list[Observation]) -> None:
         rec.add(f"    {observation.led_index}: ({observation.message_type!r}, {observation.number}),")
     rec.add("}")
     rec.add()
+    led_only = [o.led_index for o in observations if o.message_type == "led-only"]
+    if led_only:
+        rec.add(f"# Addressable but NOT pressable (lights, no button): {led_only}")
+        rec.add("# renderer.py may paint these; mappings.py must never bind an action to one.")
+        rec.add("")
     rec.add("# In Programmer mode every control ACCEPTS either note or CC; the split")
     rec.add("# above is only what the device SENDS on press (p.10). read_events() must")
     rec.add("# handle both. set_led() may use either.")

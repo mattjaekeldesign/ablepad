@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "error-spin",
+  "name": "Error Spin",
+  "engine": "generator",
+  "loop": true,
+  "duration_ms": null,
+  "generator": {
+    "type": "SPIN_SQUARE",
+    "params": {
+      "size": 6,
+      "period_ms": 2000,
+      "tail": 6,
+      "colorMode": "hue",
+      "hue": 0,
+      "seed": 1
+    }
+  },
+  "notes": "Error during-loop: a red comet circling the 6×6 ring around the centre block. Fixed hue 0 (red) on purpose — the error screen signals, it does not entertain."
+}

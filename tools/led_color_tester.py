@@ -104,7 +104,7 @@ def pages_mode(session, rec: Recorder) -> None:
         print("  Photograph the surface now.")
         print("  Shoot square-on, fixed exposure, no flash. Flash washes out the")
         print("  difference between neighbouring entries, which is the whole point.")
-        prompt("\n  Enter when photographed: ")
+        prompt("\n  Enter when photographed: ", wait_s=30.0)
 
     session.send(clear_all())
 

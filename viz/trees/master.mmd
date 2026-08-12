@@ -3,7 +3,7 @@
 %% RULE: a node becomes :::done only when the roadmap's exit test for it passes.
 %%       Code existing on disk is NOT an exit test. The Phase 1 tools are written
 %%       and they are still :::partial, because none has met a Launchpad.
-%% Last reconciled: 2026-08-07 (tools/ written)
+%% Last reconciled: 2026-08-09 (EVO 8 replaced Scarlett; Ampero II Stage added as second controller)
 
 flowchart TB
 
@@ -19,17 +19,29 @@ subgraph MA["A — SHIPPED · files that exist in this repo right now"]
     A --> A6["A.6 ◐ docs/colour-palette-candidate.json<br/>CANDIDATE ONLY — sourced from a different device"]:::partial
     A --> A7["A.7 ✓ viz/ · this tree viewer"]:::done
     A --> A8["A.8 ◐ tools/ · 6 scripts, Phase 1 bench instruments<br/>WRITTEN, NEVER RUN ON HARDWARE"]:::partial
+    A --> A9["A.9 ✓ docs/audient-evo-8-reference.md + manual PDF<br/>24pp · sha256 f2151a78…96ac6d"]:::done
+    A --> A10["A.10 ✓ docs/hotone-ampero-ii-stage-reference.md<br/>+ manual V1.7.0 (102pp) + MIDI list V1.0.2"]:::done
 end
 
 %% ══════════════════════════════════════════════════════════ SECTION B
 subgraph MB["B — VERIFIED HARDWARE FACTS · cited, safe to build on"]
     direction LR
-    B(["B · 4 of 9 assumptions closed<br/>all from the Programmer's Reference, 2026-08-07"]):::verified
-    B --> B1["B.1 ✓ Programmer Mode SysEx bytes · p.7"]:::verified
-    B --> B2["B.2 ✓ Two MIDI ports on Windows · p.6"]:::verified
-    B --> B3["B.3 ✓ Release = note-on velocity 0 · p.6"]:::verified
-    B --> B4["B.4 ✓ Batch LED write, 81 pads/msg · p.15"]:::verified
-    B --> B5["B.5 ✓ Grid corners 11 / 81 / 18 · p.14"]:::verified
+    B(["B · read from two manuals, nothing measured<br/>Launchpad X Reference 2026-08-07 · EVO 8 manual 2026-08-09"]):::verified
+    B --> B1["B.1 ✓ Programmer Mode SysEx bytes · LP p.7"]:::verified
+    B --> B2["B.2 ✓ Two MIDI ports on Windows · LP p.6"]:::verified
+    B --> B3["B.3 ✓ Release = note-on velocity 0 · LP p.6"]:::verified
+    B --> B4["B.4 ✓ Batch LED write, 81 pads/msg · LP p.15"]:::verified
+    B --> B5["B.5 ✓ Grid corners 11 / 81 / 18 · LP p.14"]:::verified
+    B --> B6["B.6 ✓ EVO 8 needs a Windows driver · EVO p.13"]:::verified
+    B --> B7["B.7 ✓ Displayed name 'EVO 8 Main Output 1+2'<br/>Loop-back 1+2 is separate · EVO p.14/36"]:::verified
+    B --> B8["B.8 ✓ Phantom gated by host port: USB-A 2 ch,<br/>USB-C @1.5A 4 ch · EVO p.22/37"]:::verified
+    B --> B9["B.9 ✓ Front DI overrides channel 1 · EVO p.24"]:::verified
+    B --> B10["B.10 ✓ ESD → EVO ceases output, replug only · EVO p.10"]:::verified
+    B --> B11["B.11 ✓ Firmware update needs internet and restarts<br/>the unit several times — bench only · EVO p.42"]:::verified
+    B --> B12["B.12 ✓ Ampero footswitch sends max 3 msgs/press,<br/>CC or PC ONLY — no Notes, no release · AMP pp.53-54"]:::verified
+    B --> B13["B.13 ✓ Ampero patch switch sends max 6 msgs · AMP p.55"]:::verified
+    B --> B14["B.14 ✓ Ampero Bluetooth resets OFF at every power-up<br/>BT MIDI unusable headless — wire USB/TRS · AMP p.82"]:::verified
+    B --> B15["B.15 ✓ Ampero receive CC map, 79 functions<br/>incl. CC0+PC = all 300 patches · MIDI list V1.0.2"]:::verified
 end
 
 %% ══════════════════════════════════════════════════════════ SECTION C
@@ -41,6 +53,8 @@ subgraph MC["C — PARTIAL · started, not proven, do not lean on it"]
     C --> C3["C.3 ◐ Grid interior notes 12-87<br/>inferred from corners, never measured"]:::partial
     C --> C4["C.4 ◐ tools/ verified only as far as a Mac allows<br/>25 pure-logic assertions, pyflakes clean,<br/>SysEx checked vs the manual's worked examples"]:::partial
     C --> C5["C.5 ◐ _bench.py restore contract<br/>covers exit / exception / Ctrl+C / SIGTERM,<br/>NEVER EXERCISED against a real device"]:::partial
+    C --> C6["C.6 ◐ EVO 8 documented, not touched<br/>manual read and extracted; driver not installed,<br/>no sound has been made through it"]:::partial
+    C --> C7["C.7 ◐ Ampero II Stage documented, not touched<br/>manual + CC map extracted; never connected,<br/>no MIDI message ever received from it"]:::partial
 end
 
 %% ══════════════════════════════════════════════════════════ SECTION D
@@ -51,6 +65,7 @@ subgraph MD["D — NOT STARTED · every module, every Windows step"]
     D --> D2["D.2 ○ launchpad/ · device, renderer, modes"]:::todo
     D --> D3["D.3 ○ set_browser/"]:::todo
     D --> D4["D.4 ○ ableton/"]:::todo
+    D --> D4b["D.4b ○ audio/ · detector + health<br/>NEW subsystem — presence and health are<br/>two different questions now"]:::todo
     D --> D5["D.5 ○ windows/ · hotspot, ssh, power"]:::todo
     D --> D6["D.6 ○ storage/ · config, runtime state"]:::todo
     D --> D7["D.7 ○ tests/"]:::todo
@@ -71,21 +86,36 @@ subgraph ME["E — BLOCKERS AND OPEN UNKNOWNS · what can still break the plan"]
     E --> E5["E.5 ✗ Beelink hosted-hotspot support"]:::unverified
     E --> E6["E.6 ✗ Ableton exe path"]:::unverified
     E --> E7["E.7 ✗ No hardware reachable from the macOS dev box"]:::unverified
+    E --> E9["E.9 ▲ ESD kills TWO devices now — Launchpad X and<br/>EVO 8. Both physical-replug-only. EVO fails SILENT"]:::riskhigh
+    E --> E10["E.10 ✗ EVO tray app = 2nd always-on process,<br/>owns ASIO buffer + sample rate"]:::unverified
+    E --> E11["E.11 ✗ EVO Windows driver is a thing Windows Update<br/>can replace or break. Freeze and record the version"]:::unverified
+    E --> E12["E.12 ✗ Can ASIO buffer + rate be changed headless?<br/>if the tray app UI is the only way, that needs<br/>SSH plus remote desktop"]:::unverified
+    E --> E13["E.13 ✗ Samson headphone model not recorded;<br/>impedance vs the EVO's '&lt;50 Ω' ceiling unchecked"]:::unverified
+    E --> E14["E.14 ◆ Beelink USB port undecided — USB-A caps the<br/>rig at 2 phantom channels forever"]:::decision
+    E --> E15["E.15 ◆ WHICH EVO endpoint means 'present'?<br/>several match; Loop-back is not the one"]:::decision
     E --> E8["E.8 ◆ MIDI input exclusivity — deferred to Phase 8<br/>deliberate, not forgotten"]:::decision
+    E --> E16["E.16 ▲ Ampero footswitch MIDI over USB UNVERIFIED<br/>manual only documents the TRS OUT jack —<br/>if TRS-only, the controller design changes"]:::riskhigh
+    E --> E17["E.17 ✗ Ampero TRS MIDI Type A vs B unknown<br/>wiring diagram is a page image — no adapters yet"]:::unverified
+    E --> E18["E.18 ✗ Ampero MIDI list is firmware V1.0.2,<br/>manual is V1.7.0 — CC map may have grown"]:::unverified
+    E --> E19["E.19 ◆ Double-press commands need a translator<br/>Ampero can't (fixed msgs) · Live map can't (stateless)<br/>→ NEW independent Bome argument, lands Phase 8"]:::decision
 end
 
 %% ══════════════════════════════════════════════════════════ SECTION F
 subgraph MF["F — NEXT · the single highest-value action, in order"]
     direction LR
-    F(["F · DO THIS NEXT<br/>the tools are written — everything below runs ON THE BEELINK"]):::next
-    F --> F1["STEP 1 → Finish Phase 0 bench truth.<br/>Guitar → Scarlett → Ableton → mixer,<br/>30 minutes, zero dropouts."]:::next
-    F1 --> F2["STEP 2 → Record the Ableton exe path<br/>and the chosen buffer / sample rate."]:::next
-    F2 --> F3["STEP 3 → Prove the restore contract FIRST.<br/>Run any tool, kill it with Ctrl+C,<br/>confirm hold-Session still opens Setup.<br/>This is the High risk — test it before trusting it."]:::next
-    F3 --> F4["STEP 4 → midi_port_inspector.py twice:<br/>--label ableton-closed, then --label ableton-open.<br/>The diff IS the exclusivity constraint."]:::next
-    F4 --> F5["STEP 5 → note_tester --frame · ~2 min.<br/>The CC frame is the actual unknown;<br/>do it before the 81-position sweep."]:::next
-    F5 --> F6["STEP 6 → Full sweep + led_batch_tester.<br/>Commit grid.py with measured values,<br/>and replace the settle-time guess."]:::next
-    F6 --> F7["STEP 7 → Colour sweep. Photograph both pages,<br/>commit the photos next to colors.py."]:::next
-    F7 --> F8["STEP 8 → Exit test 1 passes → only then Phase 2."]:::next
+    F(["F · DO THIS NEXT<br/>the tools are written — everything below runs ON THE BEELINK<br/>steps 1-2 are ONLINE work; the rig goes offline after"]):::next
+    F --> F1["STEP 1 → EVO 8 first, while the machine is online.<br/>Install the Windows driver, update firmware,<br/>record BOTH versions, photograph the serial/PIN<br/>label on the underside before anything is cased."]:::next
+    F1 --> F2["STEP 2 → Choose the Beelink USB port deliberately.<br/>USB-C at 1.5 A = 4 phantom channels; USB-A = 2,<br/>forever. Record the physical port used."]:::next
+    F2 --> F3["STEP 3 → Finish Phase 0 bench truth.<br/>Guitar → EVO front DI → Ableton → mixer,<br/>30 minutes, zero dropouts. Buffer and sample rate<br/>are set in the EVO TRAY APP, not in Ableton."]:::next
+    F3 --> F4["STEP 4 → Record the Ableton exe path,<br/>the buffer size and the sample rate."]:::next
+    F4 --> F4b["STEP 4b → Ampero bench, 10 minutes.<br/>USB-C in, NO Hotone driver: does MIDI enumerate?<br/>Does footswitch MIDI arrive over USB at all?<br/>This kills or confirms the controller design."]:::next
+    F4b --> F5["STEP 5 → interface_name_inspector.py --label evo8.<br/>Record EVERY endpoint, then decide which one<br/>means 'the interface is present'."]:::next
+    F5 --> F6["STEP 6 → Prove the restore contract.<br/>Run any tool, kill it with Ctrl+C,<br/>confirm hold-Session still opens Setup.<br/>This is the High risk — test it before trusting it."]:::next
+    F6 --> F7["STEP 7 → midi_port_inspector.py twice:<br/>--label ableton-closed, then --label ableton-open.<br/>The diff IS the exclusivity constraint."]:::next
+    F7 --> F8["STEP 8 → note_tester --frame · ~2 min.<br/>The CC frame is the actual unknown;<br/>do it before the 81-position sweep."]:::next
+    F8 --> F9["STEP 9 → Full sweep + led_batch_tester.<br/>Commit grid.py with measured values,<br/>and replace the settle-time guess."]:::next
+    F9 --> F10["STEP 10 → Colour sweep. Photograph both pages,<br/>commit the photos next to colors.py."]:::next
+    F10 --> F11["STEP 11 → Exit test 1 passes → only then Phase 2."]:::next
 end
 
 A ==> B

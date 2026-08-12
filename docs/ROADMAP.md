@@ -45,9 +45,9 @@ Revised 2026-08-07 after obtaining the Programmer's Reference Manual. Details an
 | Programmer Mode SysEx bytes | `launchpad/device.py` | ✅ **VERIFIED** p.7 | Launchpad never lights up at all |
 | Launchpad exposes 2 MIDI ports on Windows | §30 routing | ✅ **VERIFIED** p.6 | Forces the Bome decision early |
 | Release = note-on velocity 0 | Hold-to-confirm | ✅ **VERIFIED** p.6 | Hold logic silently never fires |
-| Batch LED write in one SysEx | `launchpad/renderer.py` | ✅ **VERIFIED** — 81 pads/msg, p.15 | Animations stutter; Bome gets more attractive |
-| Grid notes 11–88 | `launchpad/grid.py` | ⚠️ **Corners verified** p.14, interior inferred | Every pad mapping, every renderer |
-| CC frame 91–98 / 19–89 / 99 | `launchpad/grid.py` | ❌ Unverified — page image | Pagination and System Mode access |
+| Batch LED write in one SysEx | `launchpad/renderer.py` | ✅ **MEASURED ON HARDWARE** 2026-08-12 — 81 pads, one message, whole surface | Animations stutter; Bome gets more attractive |
+| Grid notes 11–88 | `launchpad/grid.py` | ⚠️ Corners p.14 + 7 interior notes measured 2026-08-12, all fit the rule | Every pad mapping, every renderer |
+| CC frame 91–98 / 19–89 | `launchpad/grid.py` | ✅ **MEASURED 2026-08-12** — 16/16 exact, zero mismatches. Logo 99 lights but is NOT a button | Pagination and System Mode access |
 | Colour index values | `launchpad/colors.py` | ❌ Unverified — page image; 8 indices confirmed | All LED feedback and animations |
 | Beelink Wi-Fi supports hosted hotspot | §32 | ❌ Unverified | Loses offline SSH lifeline |
 | Ableton exe path | `rig.yaml` | ❌ Unverified | Nothing launches |
@@ -129,7 +129,9 @@ Python fixes it.
 
 ```text
 □ Windows account "LiveRig" created, auto-login enabled
-□ Audient EVO 8 Windows driver installed (MANDATORY — not class-compliant on Windows)
+■ Audient EVO 8 Windows driver installed — CONFIRMED 2026-08-12: PnP knows 'EVO8'
+│   (MEDIA class) and 'Audient DFU', both currently Status=Unknown, i.e. driver present
+│   and the device has been attached before but is NOT plugged in right now
 □ EVO firmware updated WHILE STILL ONLINE; driver + firmware versions recorded
 □ EVO Mixer tray app running; ASIO buffer + sample rate set THERE, not in Ableton
 □ Beelink USB port chosen and recorded (USB-A = 2 phantom channels, USB-C @1.5A = 4)
@@ -138,7 +140,10 @@ Python fixes it.
 □ Buffer size and sample rate chosen and written down
 □ Round-trip latency measured and judged playable
 □ C:\LiveRig\ folder tree created (§8)
-□ Python 3.12+, Git, VSCode installed
+□ Python 3.12+ installed — NOT PRESENT 2026-08-12 (WindowsApps python.exe is a
+│   0-byte Store alias stub, and `py` is absent — there is no Python on the box)
+■ Git installed — CONFIRMED 2026-08-12, C:\Program Files\Git\cmd\git.exe
+□ VSCode installed — not present 2026-08-12
 □ Repo initialised, .gitignore, venv, requirements.txt
 □ Ableton executable path recorded verbatim
 ■ Launchpad X Programmer's Reference Guide downloaded to /docs   ← DONE 2026-08-07
@@ -173,8 +178,10 @@ tools/
 │   □ Brightness set for stage             — SysEx 08h from rig.yaml
 ■ Programmer Mode SysEx confirmed against the Reference Guide   ← DONE, bytes were correct
 □ Programmer Mode entry verified in code
-□ Full 9×9 note + CC map recorded → commit as launchpad/grid.py
-│   └── 8×8 pad grid corners already verified from the manual; the CC frame is the real unknown
+■ CC frame recorded — DONE 2026-08-12, tools/results/grid-frame.txt
+│   └── top row 91-98 and right column 19..89, 16/16 exact. Logo 99 = LED only, no button
+□ Full 8×8 interior sweep → commit as launchpad/grid.py
+│   └── 3 corners from the manual + 7 interior notes measured; no contradictions yet
 □ Colour index recorded → commit as launchpad/colors.py
 │   └── compare against docs/colour-palette-candidate.json, record every difference
 ■ Release semantics confirmed (note-on vel 0)                   ← DONE, manual p.6
@@ -342,7 +349,9 @@ windows/
 ```
 
 ```text
-□ OpenSSH Server installed, key auth only, password auth disabled
+■ OpenSSH Server installed — DONE 2026-08-12, key auth PROVEN from matts-mac-mini
+│   └── Tailscale 100.70.171.124 (host 'rig'), user rigma, host key verified out-of-band
+□ Password auth disabled (deferred until key login proven — it now is, so this is next)
 □ Hotspot starts and stops from a Launchpad pad
 □ iPhone joins the hotspot with no internet present
 □ SSH from iPhone reaches the Beelink

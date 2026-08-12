@@ -10,8 +10,14 @@ subgraph S0["PHASE 0 — BENCH TRUTH · Risk LOW · exit: 30 min of guitar, no d
     direction LR
     P0(["PHASE 0<br/>prove the instrument before automating it"]):::partial
     P0 --> A01["0.1 ○ Windows account 'LiveRig' + auto-login"]:::todo
-    P0 --> A02["0.2 ○ Focusrite driver installed, ASIO in Ableton"]:::todo
-    P0 --> A03["0.3 ○ Guitar → Scarlett → Ableton → mixer makes sound"]:::todo
+    P0 --> A02["0.2 ▲ Audient EVO 8 Windows driver — MANDATORY<br/>not class-compliant on Windows (p.13)"]:::riskhigh
+    P0 --> A02b["0.2b ○ EVO firmware updated WHILE ONLINE<br/>driver + firmware versions recorded"]:::todo
+    P0 --> A02c["0.2c ○ ASIO buffer + sample rate set in the<br/>EVO TRAY APP, not in Ableton (p.26)"]:::todo
+    P0 --> A03["0.3 ○ Guitar → EVO 8 front DI → Ableton → mixer<br/>DI overrides channel 1 when plugged (p.24)"]:::todo
+    P0 --> A03b["0.3b ○ Beelink USB port chosen + recorded<br/>USB-A = 2 phantom ch, USB-C @1.5A = 4 (p.22)"]:::todo
+    P0 --> A03c["0.3c ○ Correct USB cable bought, not a dongle<br/>included cable is C-to-C; USB-A port needs A-to-C (p.40)"]:::todo
+    P0 --> A03d["0.3d ▲ EVO serial + 4-digit PIN label PHOTOGRAPHED<br/>underside, unreachable once cased (p.16)"]:::riskhigh
+    P0 --> A03e["0.3e ○ Samson headphone model recorded<br/>impedance checked vs EVO output — a listening test"]:::todo
     P0 --> A04["0.4 ○ Buffer size + sample rate chosen and written down"]:::todo
     P0 --> A05["0.5 ○ Round-trip latency measured and judged playable"]:::todo
     P0 --> A06["0.6 ○ C:/LiveRig folder tree created"]:::todo
@@ -19,6 +25,9 @@ subgraph S0["PHASE 0 — BENCH TRUTH · Risk LOW · exit: 30 min of guitar, no d
     P0 --> A08["0.8 ◐ repo, .gitignore, requirements.txt done<br/>venv still owed on the Beelink"]:::partial
     P0 --> A09["0.9 ○ Ableton exe path recorded verbatim"]:::todo
     P0 --> A10["0.10 ✓ Programmer's Reference Guide in /docs"]:::done
+    P0 --> A11["0.11 ✓ EVO 8 manual + reference doc in /docs"]:::done
+    P0 --> A12["0.12 ✓ Ampero manual V1.7.0 + MIDI list V1.0.2<br/>+ reference doc in /docs"]:::done
+    P0 --> A13["0.13 ○ Ampero analog out → EVO 8 line in →<br/>Ableton hears it — USB is MIDI-only by design"]:::todo
 end
 
 %% ══════════════════════════════════════════════════════════ PHASE 1
@@ -32,21 +41,34 @@ subgraph S1["PHASE 1 — HARDWARE TRUTH · Risk MEDIUM · the most important pha
     G1A --> B12["1.2 ◐ tools/launchpad_note_tester.py<br/>lights each LED, then records the press<br/>--frame does the 17 real unknowns first"]:::partial
     G1A --> B13["1.3 ◐ tools/led_color_tester.py<br/>sweep 0-127, photograph both pages"]:::partial
     G1A --> B14["1.4 ◐ tools/led_batch_tester.py<br/>confirm + time an 81-entry SysEx<br/>also measures the settle-time guess"]:::partial
-    G1A --> B15["1.5 ◐ tools/interface_name_inspector.py<br/>what Get-PnpDevice actually returns"]:::partial
+    G1A --> B15["1.5 ◐ tools/interface_name_inspector.py<br/>run --label evo8, record EVERY endpoint"]:::partial
 
-    P1 --> G1B["1.B FACTS — closed"]:::verified
-    G1B --> C11["1.6 ✓ Programmer Mode SysEx<br/>F0 00 20 29 02 0C 0E 01 F7 · p.7"]:::verified
-    G1B --> C12["1.7 ✓ Two MIDI ports on Windows<br/>DAW first, MIDI second · p.6"]:::verified
-    G1B --> C13["1.8 ✓ Release = note-on velocity 0 · p.6"]:::verified
-    G1B --> C14["1.9 ✓ Batch LED write, 81 pads/msg · p.15"]:::verified
+    P1 --> G1B["1.B FACTS — closed, cited to a manual"]:::verified
+    G1B --> C11["1.6 ✓ Programmer Mode SysEx<br/>F0 00 20 29 02 0C 0E 01 F7 · LP p.7"]:::verified
+    G1B --> C12["1.7 ✓ Two MIDI ports on Windows<br/>DAW first, MIDI second · LP p.6"]:::verified
+    G1B --> C13["1.8 ✓ Release = note-on velocity 0 · LP p.6"]:::verified
+    G1B --> C14["1.9 ✓ Batch LED write, 81 pads/msg · LP p.15"]:::verified
+    G1B --> C15["1.9b ✓ EVO 8 needs a Windows driver<br/>not class-compliant; macOS does not · EVO p.13"]:::verified
+    G1B --> C16["1.9c ✓ Phantom power gated by host port<br/>USB-A = 2 ch, USB-C @1.5A = 4 ch · EVO p.22/37"]:::verified
+    G1B --> C17["1.9d ✓ Front DI hijacks channel 1 when plugged<br/>not a fault — do not debug a 'dead mic' · EVO p.24"]:::verified
+    G1B --> C18["1.9e ✓ ESD → EVO ceases to output sound<br/>replug is the ONLY recovery · EVO p.10"]:::verified
+    G1B --> C19["1.9f ✓ Loop-back lands on inputs 5+6<br/>4 analogue in, 6 visible in Live · EVO p.32"]:::verified
+    G1B --> C20["1.9g ✓ Ampero footswitch = max 3 msgs, CC/PC only<br/>no Notes, no release, no double-press · AMP pp.53-54"]:::verified
+    G1B --> C21["1.9h ✓ Ampero Bluetooth OFF at every power-up<br/>wire USB or TRS, never BT · AMP p.82"]:::verified
 
     P1 --> G1C["1.C FACTS — still open"]:::unverified
     G1C --> D11["1.10 ◐ Grid notes 11-88<br/>corners verified p.14, interior inferred"]:::partial
     G1C --> D12["1.11 ✗ CC frame 91-98 / 19-89 / 99"]:::unverified
     G1C --> D13["1.12 ✗ Colour index 0-127 · 8 of 128 known"]:::unverified
     G1C --> D14["1.13 ✗ Exact Windows MIDI port name strings"]:::unverified
-    G1C --> D15["1.14 ✗ Focusrite friendly names"]:::unverified
+    G1C --> D15["1.14 ✗ EVO 8 Get-PnpDevice names, ALL endpoints<br/>manual prints control-panel names, not PnP ones"]:::unverified
+    G1C --> D15b["1.14b ◆ WHICH endpoint proves 'interface present'?<br/>several match 'EVO 8' — Loop-back is not the one"]:::decision
+    G1C --> D15c["1.14c ✗ Can ASIO buffer + rate be set WITHOUT the<br/>tray app UI? If not, changing them headless<br/>needs SSH plus remote desktop"]:::unverified
+    G1C --> D15d["1.14d ✗ Samson headphone impedance vs EVO<br/>output impedance — '&lt;50 Ω' is a ceiling, not a<br/>measurement. Listening check, not a blocker"]:::unverified
     G1C --> D16["1.15 ✗ Ableton exe path"]:::unverified
+    G1C --> D17["1.15b ▲ Ampero footswitch MIDI over USB?<br/>manual documents TRS OUT only — if TRS-only,<br/>controller design changes. FIRST Ampero test"]:::riskhigh
+    G1C --> D18["1.15c ✗ Ampero Windows MIDI port name;<br/>does MIDI work WITHOUT the Hotone ASIO driver?"]:::unverified
+    G1C --> D19["1.15d ✗ Ampero TRS MIDI Type A vs B<br/>p.15 diagram is a page image — no adapters yet"]:::unverified
 
     P1 --> G1D["1.D DEVICE SETTINGS asserted at every boot"]:::todo
     G1D --> E11["1.16 ○ LED feedback external ON · SysEx 0Ah"]:::todo
@@ -105,6 +127,8 @@ subgraph S3["PHASE 3 — LAUNCHPAD SERVICE · Risk MEDIUM · most common way the
     G3C --> M3["3.10 ○ Performance Mode"]:::todo
     G3C --> M4["3.11 ○ System Mode"]:::todo
     G3C --> M5["3.12 ○ Error Mode"]:::todo
+    M5 --> M5a["3.12a ▲ AUDIO FAULT state, distinct from a<br/>Launchpad fault — the two fail differently"]:::riskhigh
+    M5 --> M5b["3.12b ○ Text-scroll SysEx says WHICH fault<br/>'NO AUDIO' beats a colour nobody remembers"]:::todo
 
     P3 --> G3D["3.D survival requirements"]:::riskhigh
     G3D --> H38["3.13 ▲ Restore Live mode in finally —<br/>on exit, exception AND signal"]:::riskhigh
@@ -129,11 +153,19 @@ end
 subgraph S5["PHASE 5 — ABLETON LAUNCHER · Risk HIGH · readiness is a guess"]
     direction LR
     P5(["PHASE 5<br/>launch, supervise, recover"]):::riskhigh
-    P5 --> K51["5.1 ○ launcher.py · start, stop, restart"]:::todo
-    P5 --> K52["5.2 ○ process.py · psutil supervision"]:::todo
-    P5 --> K53["5.3 ○ readiness.py · running vs actually loaded"]:::todo
-    P5 --> K54["5.4 ○ recovery.py · capped attempts, no infinite loop"]:::todo
-    P5 --> K55["5.5 ○ Refuses to launch without Focusrite or .als"]:::todo
+
+    P5 --> G5A["5.A ableton/ — process control"]:::todo
+    G5A --> K51["5.1 ○ launcher.py · start, stop, restart"]:::todo
+    G5A --> K52["5.2 ○ process.py · psutil supervision"]:::todo
+    G5A --> K53["5.3 ○ readiness.py · running vs actually loaded"]:::todo
+    G5A --> K54["5.4 ○ recovery.py · capped attempts, no infinite loop"]:::todo
+
+    P5 --> G5B["5.B audio/ — the interface is its own subsystem now"]:::riskhigh
+    G5B --> K59["5.9 ○ detector.py · Get-PnpDevice, match 'EVO 8'<br/>substring match, several endpoints"]:::todo
+    G5B --> K60["5.10 ▲ health.py · PRESENCE IS NOT HEALTH<br/>an ESD-wedged EVO still enumerates, silently"]:::riskhigh
+    G5B --> K61["5.11 ○ Detection and health are two questions,<br/>answered separately and logged separately"]:::todo
+
+    P5 --> K55["5.5 ○ Refuses to launch without EVO 8 or .als"]:::todo
     P5 --> K56["5.6 ○ Hold-to-confirm 2s gates every set load"]:::todo
     P5 --> K57["5.7 ○ Graceful close attempted before kill"]:::todo
     P5 --> K58["5.8 ✗ KNOWN DEBT: readiness is a timing guess<br/>until a Live Remote Script sends READY"]:::unverified
@@ -155,6 +187,14 @@ end
 subgraph S7["PHASE 7 — HEADLESS BOOT · Risk MEDIUM · USB enumeration + login timing"]
     direction LR
     P7(["PHASE 7<br/>no monitor, no keyboard, no mouse"]):::todo
+
+    P7 --> N70["7.0 ▲ STARTUP CHAIN, revised by the EVO<br/>driver → EVO tray app → (Bome?) →<br/>Rig Controller → Ableton"]:::riskhigh
+    N70 --> N70a["7.0a ○ EVO Mixer tray app autostarts<br/>it owns buffer + sample rate, so it is not optional"]:::todo
+    N70b["7.0b ▲ Windows Update can replace or break the<br/>EVO driver — a versioned artefact, freeze it"]:::riskhigh
+    N70 --> N70b
+    N70 --> N70c["7.0c ○ Driver + firmware versions in the system-image<br/>notes AND in the health check"]:::todo
+    N70 --> N70d["7.0d ○ Health check: is the EVO tray app running?<br/>its absence does not kill audio, but nobody can<br/>change buffer size without a screen"]:::todo
+
     P7 --> N71["7.1 ○ Task Scheduler at logon, restart on failure"]:::todo
     P7 --> N72["7.2 ○ Power plan: no sleep, hibernate, USB suspend"]:::todo
     P7 --> N73["7.3 ○ Notifications + update reboots disabled"]:::todo
@@ -164,9 +204,9 @@ subgraph S7["PHASE 7 — HEADLESS BOOT · Risk MEDIUM · USB enumeration + login
 end
 
 %% ══════════════════════════════════════════════════════════ PHASE 8
-subgraph S8["PHASE 8 — PERFORMANCE LAYER · Risk HIGH · the deferred decision lands here"]
+subgraph S8["PHASE 8 — PERFORMANCE LAYER · Risk HIGH · TWO deferred decisions land here"]
     direction LR
-    P8(["PHASE 8<br/>performance pads must reach Ableton"]):::riskhigh
+    P8(["PHASE 8<br/>performance pads + Ampero footswitches must reach Ableton"]):::riskhigh
 
     P8 --> Q8{"8.1 ◆ DECIDE<br/>who owns the Launchpad MIDI input?<br/>a Windows MIDI in port is exclusive"}:::decision
 
@@ -181,9 +221,13 @@ subgraph S8["PHASE 8 — PERFORMANCE LAYER · Risk HIGH · the deferred decision
     OB --> OB2["B.2 Native timers + port-plugged triggers"]:::branch
     OB --> OB3["B.3 ~79 EUR, second always-on process"]:::branch
     OB --> OB4["B.4 Python never touches MIDI"]:::branch
+    OB --> OB5["B.5 Timers also solve Ampero double-press —<br/>the only option that covers BOTH controllers"]:::branch
+
+    P8 --> Q8b{"8.1b ◆ DECIDE<br/>who synthesizes Ampero double-press?<br/>Ampero can't · Live map can't ·<br/>Bome / Max for Live / (rig = cornerstone violation)"}:::decision
 
     P8 --> R81["8.2 ○ Panic mute works from any mode"]:::todo
     P8 --> R82["8.3 ○ Guitar tones, effects, looper mapped"]:::todo
+    P8 --> R82b["8.3b ○ Ampero CC → Ableton mappings live in the<br/>Live set — footswitch + patch MIDI, per cornerstone"]:::todo
     P8 --> R83["8.4 ○ Mode switching deliberate, not accidental"]:::todo
     P8 --> R84["8.5 ○ Decision written down, with the reasoning"]:::todo
 end
@@ -195,7 +239,10 @@ subgraph S9["PHASE 9 — HARDENING · failure injection before a real gig"]
     P9 --> V91["9.1 ○ Full rehearsal test passed"]:::todo
     P9 --> V92["9.2 ○ Launchpad unplugged mid-show → recovers"]:::todo
     P9 --> V93["9.3 ○ Controller killed → Launchpad returns to Live mode"]:::todo
-    P9 --> V94["9.4 ○ Focusrite unplugged → warns, no thrash"]:::todo
+    P9 --> V94["9.4 ○ EVO 8 unplugged → warns, no thrash"]:::todo
+    P9 --> V94b["9.4b ▲ EVO 8 ESD-wedged → rig reports AUDIO FAULT<br/>enumerated but silent; replug is the ONLY fix (p.10)"]:::riskhigh
+    P9 --> V94c["9.4c ○ Launchpad AND EVO both replugged →<br/>both recover without restarting Live"]:::todo
+    P9 --> V94d["9.4d ○ Both USB cables strain-relieved and reachable<br/>without disassembly — replug is the only fix there is"]:::todo
     P9 --> V95["9.5 ○ Ableton killed → one recovery, then clean error"]:::todo
     P9 --> V96["9.6 ○ Ran continuously for 4+ hours"]:::todo
     P9 --> V97["9.7 ○ Emergency clean set loads from a cold rig"]:::todo

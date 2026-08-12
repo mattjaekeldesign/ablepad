@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="./library.css" />
     <link rel="stylesheet" href="./grid.css" />
     <link rel="stylesheet" href="./flow.css" />
+    <link rel="stylesheet" href="./animeditor.css" />
     <link rel="stylesheet" href="./inspector.css" />
   </head>
   <body>
@@ -24,6 +25,7 @@
       <div class="tabs" role="tablist" aria-label="View">
         <button role="tab" data-view="grid" class="tab active">Mapper</button>
         <button role="tab" data-view="flow" class="tab">Flow</button>
+        <button role="tab" data-view="anim" class="tab">Anim</button>
       </div>
 
       <div class="actions">
@@ -42,6 +44,7 @@
       <main class="stage">
         <section id="stage-grid"></section>
         <section id="stage-flow" class="hidden"></section>
+        <section id="stage-anim" class="hidden"></section>
       </main>
       <aside id="inspector" class="panel-right"></aside>
     </div>

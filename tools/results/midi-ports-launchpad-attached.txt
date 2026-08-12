@@ -1,0 +1,53 @@
+# Recorded by tools/midi_port_inspector.py
+# Date:     2026-08-11
+# Machine:  Windows 11
+# Backend:  mido.backends.rtmidi
+# Source:   physical measurement against the hardware
+#
+# Paste into the target module WITH this header. It is the provenance.
+
+# Label: launchpad-attached
+# Backend: mido.backends.rtmidi
+
+# --- INPUT PORTS (2) ---
+#   [0] OK   'LPX MIDI 0'
+#   [1] OK   'MIDIIN2 (LPX MIDI) 1'
+
+#   Launchpad input ports: 2
+#         daw : 'LPX MIDI 0'  <- classified by POSITION
+#        midi : 'MIDIIN2 (LPX MIDI) 1'  <- classified by POSITION
+
+# --- OUTPUT PORTS (3) ---
+#   [0] OK   'Microsoft GS Wavetable Synth 0'
+#   [1] OK   'LPX MIDI 1'
+#   [2] OK   'MIDIOUT2 (LPX MIDI) 2'
+
+#   Launchpad output ports: 2
+#         daw : 'LPX MIDI 1'  <- classified by POSITION
+#        midi : 'MIDIOUT2 (LPX MIDI) 2'  <- classified by POSITION
+
+# --- VERDICT ---
+#   Two distinct Launchpad INPUT interfaces present, as the manual
+#   describes (p.6). Strategy A in ROADMAP.md S1 is topologically
+#   possible.
+#
+#   This does NOT settle MIDI input exclusivity. Two ports means two
+#   processes can hold one each -- not that both can see the same pad
+#   press. That is still the Phase 8 question.
+
+# --- PASTE INTO launchpad/ports.py ---
+
+PORT_NAMES: dict[str, dict[str, str]] = {
+    "daw": {
+        "in":  'LPX MIDI 0',
+        "out": 'LPX MIDI 1',
+    },
+    "midi": {
+        "in":  'MIDIIN2 (LPX MIDI) 1',
+        "out": 'MIDIOUT2 (LPX MIDI) 2',
+    },
+}
+
+# Match on these EXACTLY. Windows appends an index to MIDI port names and
+# it can change across re-enumeration -- if that turns out to happen here,
+# switch to a prefix match and record why.

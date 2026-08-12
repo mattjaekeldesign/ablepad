@@ -32,6 +32,7 @@ from __future__ import annotations
 import atexit
 import json
 import platform
+import re
 import signal
 import sys
 import time
@@ -164,16 +165,24 @@ class Port:
     name: str
     role: PortRole
     ordinal: int  # position among Launchpad ports, in the order the backend reported
-    classified_by: str  # "name" or "ordinal" -- how confident we are
+    classified_by: str  # "name" | "windows-multiport" -- how the role was decided
+    interface: int | None = None  # 1-based USB interface, where it could be determined
 
 
-def _classify(name: str) -> PortRole:
-    lowered = name.lower()
-    if "daw" in lowered:
-        return PortRole.DAW
-    if "midi" in lowered:
-        return PortRole.MIDI
-    return PortRole.UNKNOWN
+# Windows names multi-port USB MIDI devices by its own convention, NOT the vendor's:
+# the first interface takes the bare device name, and every later one is prefixed
+# MIDIIN<n> / MIDIOUT<n>, n starting at 2. Measured on the rig 2026-08-12:
+#
+#     inputs :  'LPX MIDI 0'   'MIDIIN2 (LPX MIDI) 1'
+#     outputs:  'LPX MIDI 1'   'MIDIOUT2 (LPX MIDI) 2'
+#
+# The manual's names ("LPX DAW In/Out", "LPX MIDI In/Out", p.6) appear NOWHERE.
+# Naive substring matching on "daw"/"midi" therefore labels all four as MIDI, which
+# is how the first version of this file crashed the moment real hardware appeared.
+_WINDOWS_MULTIPORT = re.compile(r"\bMIDI(?:IN|OUT)(\d+)\s*\(", re.IGNORECASE)
+
+# Trailing integer that mido/rtmidi appends to disambiguate duplicate names.
+_RTMIDI_SUFFIX = re.compile(r"\s+\d+$")
 
 
 def _looks_like_launchpad(name: str) -> bool:
@@ -181,24 +190,54 @@ def _looks_like_launchpad(name: str) -> bool:
     return "launchpad" in lowered or "lpx" in lowered
 
 
+def _interface_number(name: str) -> int:
+    """1 for the bare device name, n for a MIDIIN<n>/MIDIOUT<n> prefixed name."""
+    match = _WINDOWS_MULTIPORT.search(name)
+    return int(match.group(1)) if match else 1
+
+
 def find_ports(names: Sequence[str]) -> list[Port]:
     """
     Pick the Launchpad ports out of a backend port list and label each one.
 
-    Classification is by name where the name says so. Where it does not, we fall
-    back to the manual's ordinal rule -- 'LPX DAW In/Out (or first interface on
-    Windows)', 'LPX MIDI In/Out (or second interface on Windows)' (p.6) -- and
-    mark the result as ordinal-derived so the caller can warn about it.
+    Two naming worlds, and the difference is not cosmetic:
+
+      macOS / Linux   names say which is which -- 'LPX DAW Out', 'LPX MIDI Out'.
+      Windows         names say nothing. Every port reads 'LPX MIDI'; the second
+                      interface is distinguished only by a MIDIIN2/MIDIOUT2 prefix.
+
+    So: trust an explicit 'daw' in the name when one exists. Otherwise, if any
+    sibling port carries the Windows multi-port prefix, we are in the Windows world
+    and interface number decides the role, per the manual's ordinal rule (p.6):
+    first interface = DAW, second = MIDI.
+
+    > That ordinal rule is the MANUAL'S CLAIM, not a measurement. It has not been
+    > confirmed against this hardware. Programmer Mode only works on the MIDI
+    > interface, so the cheapest proof is: enter Programmer Mode on the candidate
+    > output, press a pad, see whether the matching input reports it.
     """
+    candidates = [n for n in names if _looks_like_launchpad(n)]
+    windows_style = any(_WINDOWS_MULTIPORT.search(n) for n in candidates)
+
     ports: list[Port] = []
-    for ordinal, name in enumerate(n for n in names if _looks_like_launchpad(n)):
-        role = _classify(name)
-        if role is not PortRole.UNKNOWN:
-            ports.append(Port(name, role, ordinal, "name"))
+    for ordinal, name in enumerate(candidates):
+        lowered = name.lower()
+
+        if "daw" in lowered:  # explicit, unambiguous -- believe it
+            ports.append(Port(name, PortRole.DAW, ordinal, "name", _interface_number(name)))
             continue
-        # Ordinal fallback. p.6: first interface is DAW, second is MIDI.
-        fallback = {0: PortRole.DAW, 1: PortRole.MIDI}.get(ordinal, PortRole.UNKNOWN)
-        ports.append(Port(name, fallback, ordinal, "ordinal"))
+
+        if windows_style:
+            iface = _interface_number(name)
+            role = {1: PortRole.DAW, 2: PortRole.MIDI}.get(iface, PortRole.UNKNOWN)
+            ports.append(Port(name, role, ordinal, "windows-multiport", iface))
+            continue
+
+        if "midi" in lowered:  # explicit on macOS/Linux, meaningless on Windows
+            ports.append(Port(name, PortRole.MIDI, ordinal, "name", _interface_number(name)))
+            continue
+
+        ports.append(Port(name, PortRole.UNKNOWN, ordinal, "name", None))
     return ports
 
 
@@ -224,6 +263,29 @@ class BenchError(RuntimeError):
     """A bench precondition failed. Always actionable, never a stack trace at the user."""
 
 
+def _deliver_sysex(inport: "mido.ports.BaseInput") -> None:
+    """
+    Stop python-rtmidi from throwing our SysEx replies away.
+
+    RtMidiIn defaults to ignoreTypes(sysex=True, timing=True, active_sense=True), and
+    mido does not clear it. MEASURED consequence on the rig 2026-08-12: the Universal
+    Device Inquiry reply never arrived, so the boot-time presence check reported "no
+    reply" from a device that was sitting there working perfectly. Notes and CCs were
+    unaffected, which is what made it look like a hardware problem rather than a
+    default.
+
+    Anything that expects a SysEx *reply* -- device inquiry, and every readback
+    command in the p.29 table -- is broken without this.
+    """
+    rt = getattr(inport, "_rt", None) or getattr(inport, "_port", None)
+    if rt is None:
+        return
+    try:
+        rt.ignore_types(sysex=False, timing=False, active_sense=False)
+    except Exception:  # noqa: BLE001 -- best effort; a different backend may not have it
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Device identity
 # ---------------------------------------------------------------------------
@@ -242,23 +304,41 @@ class DeviceIdentity:
         return f"Launchpad X, {state}, version {self.version}"
 
 
-_INQUIRY_PREFIX = (0x7E, 0x00, 0x06, 0x02, 0x00, 0x20, 0x29, 0x13)
+_INQUIRY_HEAD = (0x7E,)  # data[1] is the device ID and varies
+_INQUIRY_SUBID = (0x06, 0x02)  # data[2:4]
+_NOVATION = (0x00, 0x20, 0x29)  # data[4:7]
 _STATE_APPLICATION = 0x01
 _STATE_BOOTLOADER = 0x11
 
 
 def parse_device_inquiry(data: Sequence[int]) -> DeviceIdentity | None:
     """
-    Reply shape (p.6), mido convention so F0/F7 are already stripped:
+    Reply shape per the manual (p.6), mido convention so F0/F7 are stripped:
         7E 00 06 02 00 20 29 13 <state> 00 00 <4 version bytes>
-    <state> 01 = application, 11 = bootloader. Version is 4 bytes, one digit each.
+
+    MEASURED on the rig 2026-08-12, the actual reply was:
+        7E 00 06 02 00 20 29 03 01 00 00 00 03 05
+                              ^^
+    Byte 7 is 0x03, NOT the 0x13 the manual prints, and the whole message is one
+    byte shorter than the manual's layout implies. The state byte that follows it
+    is 0x01 = application, which does match.
+
+    So byte 7 is NOT validated here -- the first version of this function required
+    0x13 and silently returned None against real hardware, which is how the boot-time
+    presence check "worked" in tests and failed on the bench. What is validated is
+    the part the MIDI spec guarantees: the 7E .. 06 02 sub-ID and the Novation
+    manufacturer ID. Everything after is reported, not asserted.
     """
-    if len(data) < 13 or tuple(data[:8]) != _INQUIRY_PREFIX:
+    if len(data) < 9:
+        return None
+    if tuple(data[:1]) != _INQUIRY_HEAD:
+        return None
+    if tuple(data[2:4]) != _INQUIRY_SUBID or tuple(data[4:7]) != _NOVATION:
         return None
     state = data[8]
     if state not in (_STATE_APPLICATION, _STATE_BOOTLOADER):
         return None
-    version = "".join(str(b) for b in data[11:15])
+    version = ".".join(str(b) for b in data[11:]) or "unknown"
     return DeviceIdentity(state == _STATE_APPLICATION, version, tuple(data))
 
 
@@ -316,6 +396,7 @@ class LaunchpadBench:
 
         self.inport = mido.open_input(chosen_in.name)
         self.outport = mido.open_output(chosen_out.name)
+        _deliver_sysex(self.inport)
         print(f"  in : {chosen_in.name}")
         print(f"  out: {chosen_out.name}")
 
@@ -521,7 +602,26 @@ def require_windows(tool: str) -> None:
         sys.exit(1)
 
 
-def prompt(message: str) -> str:
+def prompt(message: str, default: str = "", wait_s: float = 0.0) -> str:
+    """
+    Ask the operator something, and cope with there being no operator terminal.
+
+    These tools are driven over SSH from another machine, where stdin is at EOF
+    immediately. The first version raised SystemExit on EOF, which meant a bare
+    "Ready? press Enter" line aborted the whole run before it started -- observed
+    2026-08-12 on the first attempt at the frame sweep.
+
+    With no tty we announce the default and continue. Where the prompt exists to
+    give a human TIME rather than to collect an answer -- "photograph this now" --
+    pass wait_s and the pause happens anyway. The Launchpad's own lit pad is the
+    real prompt in the guided sweeps, so nothing is lost.
+    """
+    if not sys.stdin.isatty():
+        note = f" [no tty, continuing{f', waiting {wait_s:.0f}s' if wait_s else ''}]"
+        print(f"{message}{note}", flush=True)
+        if wait_s:
+            time.sleep(wait_s)
+        return default
     try:
         return input(message)
     except (EOFError, KeyboardInterrupt):

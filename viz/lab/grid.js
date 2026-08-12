@@ -15,7 +15,8 @@
  */
 import { PAD_IDS, padKind, padIsButton, ACTIONS } from './schema.js'
 import { ledHex, paletteIsUnverified } from './palette.js'
-import { store, selectPad, openConfig, toast } from './store.js'
+import { store, selectPad, openConfig, resolveAnimation, toast } from './store.js'
+import { animationFrame } from './anim.js'
 
 /* ═══════════════════════════════════════════════════════════ timing constants */
 
@@ -27,11 +28,39 @@ const PULSE_PERIOD_MS = 1000 // dark↔full brightness ramp
 /** What an unlit LED looks like — matches palette.js's index-0 rendering. */
 const LED_OFF_HEX = '#101013'
 
+/**
+ * Failsafe: an intro that never reports "finished" (loop on, or no duration) would
+ * cover the surface forever. The rig must never feel bricked by eye candy — hard cap.
+ */
+const INTRO_MAX_MS = 15000
+
 /* ═══════════════════════════════════════════════════════════════ module state */
 
 const padEls = new Map() // padId → { root, label } — built once in buildBoard()
 const animated = new Map() // padId → led spec currently needing per-frame colour
 let rafId = 0 // the ONE requestAnimationFrame handle; 0 = loop stopped
+
+/* Screen-animation compositor state. The stack, top first:
+     intro (full cover) → sim-pressed LED → during 'over' → bound pads → during 'under'
+     (unbound pads only) → background.
+   Specs are resolved animation objects; the open working copy resolves live, so
+   editing an animation animates the mapper in real time. */
+let introAnim = null // playing intro, or null
+let introStart = 0
+let duringAnim = null // looping ambient, or null
+let duringLayer = 'under'
+let duringStart = 0
+let overlay = null // this tick's composite: { frame: Map, cover, layer } | null
+let armToken = 0 // guards against a stale async resolve landing after a config switch
+
+/* Render-loop economy. Screen animations only change 30×/s (ANIM_TICK_MS), so:
+   - lastTickIdx gates frame recomputes to tick boundaries, not 60 Hz rAF;
+   - lastHex makes every style write a diff — a pad the frame didn't change
+     costs a string compare, not a browser restyle;
+   - gridVisible parks the whole loop while another centre view is showing. */
+let lastTickIdx = -1
+const lastHex = new Map() // padId → the background we last wrote
+let gridVisible = true // the Mapper section is the visible centre view
 
 let press = null // sim press in flight: { padId, startedAt, holdMs, fired }
 let holdRingEl = null // single progress-ring overlay, moved onto whichever pad is held
@@ -51,21 +80,93 @@ export function initGrid(rootEl) {
 
   store.on('config:loaded', () => {
     cancelPress() // the surface under the finger just changed meaning
+    armAnimations({ intro: store.state.sim }) // mode entry — repaints when resolved
     paintAll()
   })
   store.on('config:changed', (payload) => {
     if (payload?.padId) paintPad(payload.padId)
-    else paintAll() // name / background / bulk edits
+    else {
+      armAnimations({ intro: false }) // animation slots may have changed; never replay intro
+      paintAll() // name / background / bulk edits
+    }
   })
   store.on('pad:selected', showSelection)
   store.on('sim:changed', (on) => {
     cancelPress()
     simBadgeEl.classList.toggle('lg-on', on)
     stageEl.classList.toggle('lg-simming', on)
+    armAnimations({ intro: on }) // entering sim = entering the mode: intro plays
+  })
+  // Live preview: the open animation IS the resolved object when referenced, but a
+  // fresh open/save/delete changes which object the refs resolve to — re-arm.
+  store.on('anim:loaded', () => armAnimations({ intro: false }))
+  store.on('anim:changed', () => ensureLoop()) // same object mutated — just keep ticking
+  store.on('animlib:changed', () => armAnimations({ intro: false }))
+  // Park the loop while Flow/Anim is showing — a hidden Mapper must cost nothing.
+  store.on('view:changed', (view) => {
+    gridVisible = view === 'grid'
+    if (gridVisible) {
+      paintAll() // catch up on whatever moved while we were parked
+      ensureLoop()
+    } else if (rafId) {
+      cancelAnimationFrame(rafId)
+      rafId = 0
+    }
   })
 
   paintAll()
   showSelection(store.state.selectedPad)
+}
+
+/* ═══════════════════════════════════════════════════════ screen animations */
+
+/**
+ * Resolve the open config's intro/during refs into playable specs. Async because a
+ * ref may need a fetch; the token discards a resolve that a config switch outran.
+ * Dangling refs resolve to null and simply do not play — never an error mid-set.
+ */
+async function armAnimations({ intro }) {
+  const token = ++armToken
+  const slots = store.state.config?.animations
+  const wantDuring = slots?.during?.ref ?? null
+  const wantIntro = intro ? (slots?.intro?.ref ?? null) : null
+
+  const [nextDuring, nextIntro] = await Promise.all([
+    wantDuring ? resolveAnimation(wantDuring).catch(() => null) : null,
+    wantIntro ? resolveAnimation(wantIntro).catch(() => null) : null,
+  ])
+  if (token !== armToken) return // a newer arm superseded this one
+
+  const now = performance.now()
+  duringAnim = nextDuring
+  duringLayer = slots?.during?.layer ?? 'under'
+  duringStart = now
+  introAnim = nextIntro
+  introStart = now
+  ensureLoop()
+  if (!rafId) paintAll() // nothing animates (e.g. slots cleared) — still repaint once
+}
+
+/** The composite frame for this instant, or null when no screen animation shows. */
+function computeOverlay(now) {
+  if (introAnim) {
+    const t = now - introStart
+    const frame = t < INTRO_MAX_MS ? animationFrame(introAnim, t) : null
+    if (frame) return { frame, cover: true }
+    endIntro(now) // finished (or hit the failsafe cap) — reveal the mode
+  }
+  if (duringAnim) {
+    const frame = animationFrame(duringAnim, now - duringStart)
+    if (frame) return { frame, cover: false, layer: duringLayer }
+    duringAnim = null // a non-looping 'during' ran out — back to the static screen
+  }
+  return null
+}
+
+/** Intro over (finished, capped, or skipped by a press): the during-loop starts NOW. */
+function endIntro(now) {
+  introAnim = null
+  duringStart = now
 }
 
 /* ═══════════════════════════════════════════════════════════════ DOM building */
@@ -173,21 +274,62 @@ function ledFor(id) {
   return config.background ?? { type: 'off' }
 }
 
-/** Restyle one pad and (de)register it with the animation loop. Cheap by design. */
-function paintPad(id) {
+/**
+ * What the current screen-animation overlay contributes to pad `id`, or null to let
+ * the pad's own LED show. Unpainted overlay cells are transparent — except an intro,
+ * which covers the whole surface (its unpainted cells read as LED off).
+ */
+function overlaySpecFor(id) {
+  if (!overlay) return null
+  const spec = overlay.frame.get(id)
+  if (overlay.cover) return spec ?? { type: 'off' } // intro: full cover
+  if (!spec) return null
+  if (store.state.sim && press?.padId === id) return null // pressed feedback beats ambient
+  if (overlay.layer === 'over') return spec
+  return store.state.config?.pads?.[id] ? null : spec // 'under': bound pads win
+}
+
+/** Write a pad background ONLY if it differs from what is already on screen. */
+function setPadColor(id, hex) {
+  if (lastHex.get(id) === hex) return
+  lastHex.set(id, hex)
+  const refs = padEls.get(id)
+  if (refs) refs.root.style.background = hex
+}
+
+/** The colour a pad shows at `now` — overlay first, then its own LED. No DOM. */
+function padHexAt(id, now) {
+  const led = overlaySpecFor(id) ?? ledFor(id)
+  return led.type === 'flash' || led.type === 'pulse' ? animColor(led, now) : ledHex(led)
+}
+
+/**
+ * Restyle one pad and (de)register it with the animation loop. Cheap by design.
+ *
+ * Two different questions, deliberately answered from two different LEDs:
+ *   what the pad IS   → `own`, its own binding. Decides whether it needs animating.
+ *   what is ON SCREEN → `shown`, the overlay composited over it. Decides the colour.
+ *
+ * Keeping these apart matters. A screen animation HIDES a flash/pulse pad; it does not
+ * cancel it. Registering from the composite deregisters every flash/pulse pad for as
+ * long as an intro covers the surface — and when the intro ends, `animated` is empty,
+ * loopNeeded() goes false, the loop stops, and every flash/pulse pad is stranded
+ * mid-phase with no repaint to rescue it.
+ */
+function paintPad(id, now = performance.now()) {
   const refs = padEls.get(id)
   if (!refs) return
   const config = store.state.config
-  const led = ledFor(id)
+  const own = ledFor(id)
+  const shown = overlaySpecFor(id) ?? own
 
-  if (led.type === 'flash' || led.type === 'pulse') {
-    animated.set(id, led)
-    refs.root.style.background = animColor(led, performance.now())
-    ensureLoop()
-  } else {
-    animated.delete(id)
-    refs.root.style.background = ledHex(led)
-  }
+  const ownAnimates = own.type === 'flash' || own.type === 'pulse'
+  if (ownAnimates) animated.set(id, own)
+  else animated.delete(id)
+
+  const shownAnimates = shown.type === 'flash' || shown.type === 'pulse'
+  setPadColor(id, shownAnimates ? animColor(shown, now) : ledHex(shown))
+  if (ownAnimates) ensureLoop()
 
   const pad = config?.pads?.[id]
   refs.label.textContent = pad?.label ?? ''
@@ -201,6 +343,7 @@ function paintAll() {
   nameEl.textContent = config ? config.name : 'no config open'
   nameEl.classList.toggle('lg-muted', !config)
   animated.clear()
+  overlay = computeOverlay(performance.now())
   for (const id of PAD_IDS) paintPad(id)
 }
 
@@ -224,7 +367,12 @@ function animColor(led, now) {
 
 /** The loop runs only while something on screen actually moves. */
 function loopNeeded() {
-  return animated.size > 0 || (press !== null && press.holdMs > 0 && !press.fired)
+  return (
+    animated.size > 0 ||
+    introAnim !== null ||
+    duringAnim !== null ||
+    (press !== null && press.holdMs > 0 && !press.fired)
+  )
 }
 
 function ensureLoop() {
@@ -233,9 +381,22 @@ function ensureLoop() {
 
 function tick(now) {
   rafId = 0
-  for (const [id, led] of animated) {
-    const refs = padEls.get(id)
-    if (refs) refs.root.style.background = animColor(led, now)
+  if (!gridVisible) return // parked — view:changed restarts us
+
+  if (introAnim || duringAnim || overlay) {
+    // Screen animation running: frames only change on 30 fps tick boundaries, so
+    // rAF calls between ticks (60+ Hz displays) cost one integer compare and exit.
+    // On a tick: recompute the composite, diff-paint the surface — setPadColor
+    // touches only pads whose colour actually changed this frame.
+    const tickIdx = Math.floor((now * 30) / 1000)
+    if (tickIdx !== lastTickIdx) {
+      lastTickIdx = tickIdx
+      overlay = store.state.config ? computeOverlay(now) : null
+      for (const id of PAD_IDS) setPadColor(id, padHexAt(id, now))
+    }
+  } else if (animated.size) {
+    // No screen animation — just flash/pulse pads, smooth at full rAF rate.
+    for (const [id, led] of animated) setPadColor(id, animColor(led, now))
   }
   if (press && press.holdMs > 0 && !press.fired) advanceHold(now)
   if (loopNeeded()) rafId = requestAnimationFrame(tick)
@@ -265,6 +426,13 @@ function parseColor(str) {
 function onSimPress(e, id) {
   if (!store.state.sim || !store.state.config) return
   if (!padIsButton(id)) return // the logo is light-only — it never sends events
+  if (introAnim) {
+    // The press SKIPS the intro and is consumed by it — the pad underneath must not
+    // fire, because the player couldn't see what they were pressing. Rig rule too.
+    endIntro(performance.now())
+    paintAll()
+    return
+  }
   cancelPress() // a stray second pointer replaces, never stacks
 
   const action = store.state.config.pads?.[id]?.action

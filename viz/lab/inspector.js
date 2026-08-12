@@ -23,6 +23,8 @@ import {
   clearPad,
   updateConfigMeta,
   setTransitions,
+  updateAnim,
+  updateAnimFrames,
 } from './store.js'
 import {
   ACTIONS,
@@ -33,6 +35,11 @@ import {
   padKind,
   padIsButton,
   validateConfig,
+  validateAnimation,
+  GENERATORS,
+  GENERATOR_TYPES,
+  generatorDefaults,
+  ANIM_LAYERS,
 } from './schema.js'
 import { paletteHex, paletteIndices, paletteIsUnverified, ledHex } from './palette.js'
 
@@ -47,6 +54,9 @@ const FLASH_HINT = 'Alternates A/B each beat — free-run 0.5 s.'
 const RGB_HINT = 'RGB is SysEx-only (type 3).'
 const TRANSITIONS_HINT = 'Edges in the Flow view come from these + SWITCH_MODE pads.'
 const CC_UNVERIFIED_HINT = 'CC frame map is UNVERIFIED — inferred from the manual’s page image, not hardware-tested.'
+const ANIM_SLOTS_HINT = 'Intro plays once on mode entry, full-cover — any press skips it. During loops with the pads: "under" lets bound pads win, "over" washes across everything.'
+const ANIM_DURATION_HINT = 'Empty = runs forever (fine as a during-loop). An intro needs an end — the player caps runaway intros at 15 s.'
+const FRAMES_PAINT_HINT = 'Paint pads in the Anim view (3). Each frame is a snapshot; unpainted pads are transparent.'
 const PALETTE_COLUMNS = 16 // 128 indices → 16 × 8 picker grid (set in inspector.css too)
 const FALLBACK_PALETTE_INDEX = 3 // white in the candidate palette — a fresh pick must be visible
 const POPOVER_GAP_PX = 4
@@ -67,6 +77,7 @@ let activePopover = null // { pop, anchor } — at most one palette popover at a
 const ledOpenOverride = new Map() // LED state name → user's manual open/closed choice
 let validationBox = null // live-updated nodes in the config view; null in other views
 let summaryLine = null
+let currentView = 'grid' // which centre view is showing — 'anim' switches this panel's subject
 
 /* ═══════════════════════════════════════════════════════════════════ public API */
 
@@ -85,11 +96,36 @@ export function initInspector(rootEl) {
   store.on('config:changed', () => {
     if (!applying) render() // another panel edited the config — reflect it
   })
+  // The inspector follows the centre view: Mapper/Flow edit the config, Anim edits
+  // the open animation. One panel, one subject at a time — never a mixed form.
+  store.on('view:changed', (v) => {
+    currentView = v
+    render()
+  })
+  store.on('anim:loaded', () => render())
+  store.on('anim:changed', () => {
+    if (!applying) queueRender() // paint drags fire per pointer event — coalesce to one rebuild per display frame
+  })
+  store.on('animlib:changed', () => render()) // animation ref dropdowns refresh
+  store.on('animframe:selected', () => {
+    if (currentView === 'anim') render() // the duration field targets the new frame
+  })
   document.addEventListener('click', onDocumentClick)
   render()
 }
 
 /* ═══════════════════════════════════════════════════════════════ store guard */
+
+let renderQueued = false
+/** Coalesce burst re-renders (paint strokes) into at most one per display frame. */
+function queueRender() {
+  if (renderQueued) return
+  renderQueued = true
+  requestAnimationFrame(() => {
+    renderQueued = false
+    render()
+  })
+}
 
 /**
  * Run a store mutation with the `applying` flag raised, so our own
@@ -126,6 +162,12 @@ function render() {
   validationBox = null
   summaryLine = null
   root.innerHTML = ''
+  if (currentView === 'anim') {
+    const anim = store.state.anim
+    if (!anim) renderEmpty('No animation open', 'Open or create an animation in the library.')
+    else renderAnimView(anim)
+    return
+  }
   const { config, selectedPad } = store.state
   if (!config) renderEmpty()
   else if (selectedPad === null) renderConfigView(config)
@@ -134,12 +176,9 @@ function render() {
 
 /* ── display A: nothing open ─────────────────────────────────────────────────── */
 
-function renderEmpty() {
+function renderEmpty(title = 'No config open', hint = 'Open or create a config in the library to edit it here.') {
   const box = el('div', 'ins-empty')
-  box.append(
-    el('div', 'ins-empty-title', 'No config open'),
-    el('div', 'ins-hint', 'Open or create a config in the library to edit it here.'),
-  )
+  box.append(el('div', 'ins-empty-title', title), el('div', 'ins-hint', hint))
   root.append(box)
 }
 
@@ -175,6 +214,16 @@ function renderConfigView(config) {
     panel.append(sec)
   }
 
+  // Animations — which library animations this screen plays, and how they sit
+  // relative to the bound pads. Refs only; the animations themselves are edited
+  // in the Anim view.
+  {
+    const { root: sec, body } = makeSection('Animations')
+    body.append(animSlotEditor(config, 'intro', 'Intro'), animSlotEditor(config, 'during', 'During'))
+    body.append(el('div', 'ins-hint', ANIM_SLOTS_HINT))
+    panel.append(sec)
+  }
+
   // Transitions — the flow graph's explicit edges.
   {
     const { root: sec, body } = makeSection('Transitions')
@@ -207,14 +256,51 @@ function padsBoundText(config) {
 
 /** Re-fill the live diagnostic nodes without rebuilding the forms around them. */
 function refreshDiagnostics() {
-  const config = store.state.config
-  if (!config) return
-  if (summaryLine?.isConnected) summaryLine.textContent = padsBoundText(config)
+  const subject = currentView === 'anim' ? store.state.anim : store.state.config
+  if (!subject) return
+  if (summaryLine?.isConnected && currentView !== 'anim') summaryLine.textContent = padsBoundText(subject)
   if (!validationBox?.isConnected) return
   validationBox.innerHTML = ''
-  const { ok, errors } = validateConfig(config)
+  const { ok, errors } = currentView === 'anim' ? validateAnimation(subject) : validateConfig(subject)
   if (ok) validationBox.append(el('div', 'ins-valid-ok', 'valid — no issues'))
   else for (const err of errors) validationBox.append(el('div', 'ins-valid-err', err))
+}
+
+/* ── animation slots ─────────────────────────────────────────────────────────── */
+
+/**
+ * One slot row: animation picker, plus (during only) the layer picker. Writes a
+ * whole slot object or null — a slot is either bound or it isn't.
+ */
+function animSlotEditor(config, slot, label) {
+  const binding = config.animations?.[slot] ?? null
+  const wrap = el('div', 'ins-anim-slot')
+
+  const options = [
+    { value: '', label: '— none —' },
+    ...store.state.animLibrary.map((a) => ({ value: a.id, label: a.name || a.id })),
+  ]
+  const refSelect = makeSelect(options, binding?.ref ?? '', (ref) => {
+    const next = ref ? { ref, ...(slot === 'during' ? { layer: binding?.layer ?? 'under' } : {}) } : null
+    apply(() => updateConfigMeta({ animations: { [slot]: next } }))
+    render() // binding appeared/vanished — the layer row must follow
+  })
+  wrap.append(makeRow(label, refSelect))
+
+  if (slot === 'during' && binding?.ref) {
+    const layerOptions = ANIM_LAYERS.map((l) => ({ value: l, label: l === 'under' ? 'under (pads win)' : 'over (covers pads)' }))
+    wrap.append(
+      makeRow('Layer', makeSelect(layerOptions, binding.layer ?? 'under', (layer) =>
+        apply(() => updateConfigMeta({ animations: { [slot]: { layer } } })),
+      )),
+    )
+  }
+
+  // Dangling ref: the file was deleted or renamed. Loud here, silent at runtime.
+  if (binding?.ref && !store.state.animLibrary.some((a) => a.id === binding.ref))
+    wrap.append(el('div', 'ins-hint ins-hint--warn', `"${binding.ref}" is not in the library — this slot will not play.`))
+
+  return wrap
 }
 
 /* ── transitions ─────────────────────────────────────────────────────────────── */
@@ -301,6 +387,120 @@ function renderPadView(config, padId) {
   panel.append(clear)
 
   root.append(panel)
+}
+
+/* ── display D: animation settings (Anim view) ───────────────────────────────── */
+
+/**
+ * Properties of the OPEN animation. The board, transport and painting live in the
+ * Anim view; everything with a label and a value lives here — same split as
+ * Mapper (grid) vs pad properties (this panel).
+ */
+function renderAnimView(anim) {
+  const panel = el('div', 'ins-root')
+
+  const head = el('div', 'ins-head')
+  const titleRow = el('div', 'ins-title-row')
+  titleRow.append(el('div', 'ins-title', anim.name || anim.id), el('span', 'ins-chip', anim.engine))
+  head.append(titleRow, el('div', 'ins-sub', `animations/${anim.id}.json`))
+  panel.append(head)
+
+  // Identity + playback shape.
+  {
+    const { root: sec, body } = makeSection('Animation')
+    body.append(
+      makeRow('Name', makeTextInput(anim.name, (v) => apply(() => updateAnim({ name: v })))),
+      makeRow('Loop', makeCheckbox(anim.loop, (v) => {
+        apply(() => updateAnim({ loop: v, ...(v ? { duration_ms: null } : {}) }))
+        render() // the Duration row appears/disappears with this
+      })),
+    )
+    if (anim.engine === 'generator' && !anim.loop) {
+      body.append(
+        makeRow('Duration (ms)', makeNumberInput(anim.duration_ms ?? '', { min: 100, step: 100 }, (v) =>
+          apply(() => updateAnim({ duration_ms: v ?? null })),
+        )),
+        el('div', 'ins-hint', ANIM_DURATION_HINT),
+      )
+    }
+    panel.append(sec)
+  }
+
+  // Generator — type + params straight from the catalogue, exactly like actions.
+  if (anim.engine === 'generator') {
+    const type = anim.generator?.type
+    const spec = GENERATORS[type]
+    const { root: sec, body } = makeSection('Generator')
+
+    body.append(
+      makeRow('Type', makeSelect(
+        GENERATOR_TYPES.map((t) => ({ value: t, label: GENERATORS[t].label })),
+        type,
+        (nextType) => {
+          // Full replacement: old params cleared, new catalogue defaults in — the
+          // same mergeDeep discipline as switching an action type.
+          apply(() =>
+            updateAnim({
+              generator: { type: nextType, params: replacingKeys(anim.generator?.params, generatorDefaults(nextType)) },
+            }),
+          )
+          render() // new type → new param fields
+        },
+      )),
+    )
+
+    if (spec)
+      for (const [key, paramSpec] of Object.entries(spec.params)) {
+        body.append(makeRow(paramSpec.label ?? key, generatorParamControl(anim, key, paramSpec)))
+      }
+    panel.append(sec)
+  }
+
+  // Frames — durations here, painting in the Anim view.
+  if (anim.engine === 'frames') {
+    const { root: sec, body } = makeSection('Frames')
+    const frames = anim.frames ?? []
+    const index = Math.min(store.state.animFrame, frames.length - 1)
+    const frame = frames[index]
+    body.append(el('div', 'ins-summary', `${frames.length} frame${frames.length === 1 ? '' : 's'} · editing #${index + 1}`))
+    if (frame) {
+      body.append(
+        makeRow('Duration (ms)', makeNumberInput(frame.duration_ms, { min: 33, step: 33 }, (v) => {
+          const next = frames.map((f, i) => (i === index ? { ...f, duration_ms: v ?? 33 } : f))
+          apply(() => updateAnimFrames(next))
+        })),
+      )
+    }
+    body.append(el('div', 'ins-hint', FRAMES_PAINT_HINT))
+    panel.append(sec)
+  }
+
+  // Notes + the same live validation contract as configs.
+  {
+    const { root: sec, body } = makeSection('Notes')
+    body.append(makeTextarea(anim.notes, (v) => apply(() => updateAnim({ notes: v }))))
+    panel.append(sec)
+  }
+  {
+    const { root: sec, body } = makeSection('Validation')
+    validationBox = el('div', 'ins-validation')
+    body.append(validationBox)
+    panel.append(sec)
+  }
+
+  root.append(panel)
+  refreshDiagnostics()
+}
+
+/** Generator param → form control. Number-valued selects (e.g. size) stay numbers. */
+function generatorParamControl(anim, key, spec) {
+  const value = anim.generator?.params?.[key] ?? spec.default
+  const write = (v) => apply(() => updateAnim({ generator: { params: { [key]: v } } }))
+  if (spec.type === 'select') {
+    const numeric = typeof spec.options[0]?.value === 'number'
+    return makeSelect(spec.options, value, (v) => write(numeric ? Number(v) : v))
+  }
+  return makeNumberInput(value ?? '', { min: spec.min, max: spec.max, step: spec.step }, write)
 }
 
 /* ── action editor — rendered FROM the catalogue, never hand-built per action ── */
@@ -535,6 +735,14 @@ function makeSection(title, { open = true } = {}) {
   const body = el('div', 'ins-body')
   details.append(el('summary', 'ins-section-head', title), body)
   return { root: details, body }
+}
+
+function makeCheckbox(checked, onChange) {
+  const input = el('input', 'ins-check')
+  input.type = 'checkbox'
+  input.checked = !!checked
+  input.addEventListener('change', () => onChange(input.checked))
+  return input
 }
 
 function makeTextInput(value, onInput) {

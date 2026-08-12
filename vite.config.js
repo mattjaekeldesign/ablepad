@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { scoreTree } from './viz/progress.js'
 
 /**
  * The rig itself is Python. This config exists only for the web tooling in viz/:
@@ -16,10 +18,18 @@ import { fileURLToPath } from 'node:url'
  */
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url))
-const CONFIG_DIR = path.join(ROOT, 'configs')
 const PALETTE_FILE = path.join(ROOT, 'docs', 'colour-palette-candidate.json')
 
-/** Config ids are filenames. Lock them down so the API can never write outside configs/. */
+/**
+ * The two saved-entity collections. Same REST shape, different directory — screens
+ * in configs/, reusable animations in animations/. Both are what the rig loads later.
+ */
+const COLLECTIONS = {
+  configs: path.join(ROOT, 'configs'),
+  animations: path.join(ROOT, 'animations'),
+}
+
+/** Ids are filenames. Lock them down so the API can never write outside its directory. */
 const ID_RE = /^[a-z0-9][a-z0-9_-]*$/
 
 function readBody(req) {
@@ -43,16 +53,18 @@ function send(res, status, obj) {
 /**
  * Dev-server-only REST API. Deliberately dumb: files on disk, no database, no cache.
  *
- *   GET    /api/palette        → { unverified: true, colors: { "0": "#616161", … } }
- *   GET    /api/configs        → [{ id, name, kind, modified }]   (index)
- *   GET    /api/configs/:id    → the full config JSON
- *   PUT    /api/configs/:id    → save (body must be the full config; body.id must match)
- *   DELETE /api/configs/:id    → delete the file
+ *   GET    /api/palette             → { unverified: true, colors: { "0": "#616161", … } }
+ *   GET    /api/<collection>        → [{ id, name, kind?, engine?, modified }]   (index)
+ *   GET    /api/<collection>/:id    → the full JSON
+ *   PUT    /api/<collection>/:id    → save (body must be the full entity; body.id must match)
+ *   DELETE /api/<collection>/:id    → delete the file
+ *
+ * <collection> is 'configs' or 'animations' — same handler, different directory.
  */
 function configApiPlugin() {
   async function handle(req, res) {
     const url = new URL(req.url, 'http://x')
-    const parts = url.pathname.split('/').filter(Boolean) // ['api', 'configs', id?]
+    const parts = url.pathname.split('/').filter(Boolean) // ['api', collection, id?]
 
     if (parts[1] === 'palette' && req.method === 'GET') {
       const colors = JSON.parse(fs.readFileSync(PALETTE_FILE, 'utf8'))
@@ -63,19 +75,21 @@ function configApiPlugin() {
       })
     }
 
-    if (parts[1] !== 'configs') return send(res, 404, { error: 'unknown endpoint' })
+    const dir = COLLECTIONS[parts[1]]
+    if (!dir) return send(res, 404, { error: 'unknown endpoint' })
     const id = parts[2]
 
     if (!id && req.method === 'GET') {
-      if (!fs.existsSync(CONFIG_DIR)) return send(res, 200, [])
+      if (!fs.existsSync(dir)) return send(res, 200, [])
       const index = fs
-        .readdirSync(CONFIG_DIR)
+        .readdirSync(dir)
         .filter((f) => f.endsWith('.json') && !f.startsWith('_'))
         .map((f) => {
-          const file = path.join(CONFIG_DIR, f)
+          const file = path.join(dir, f)
           try {
             const c = JSON.parse(fs.readFileSync(file, 'utf8'))
-            return { id: c.id, name: c.name, kind: c.kind, modified: fs.statSync(file).mtimeMs }
+            // kind (configs) / engine (animations): pass through whichever exists.
+            return { id: c.id, name: c.name, kind: c.kind, engine: c.engine, modified: fs.statSync(file).mtimeMs }
           } catch {
             // A hand-edited broken file must show up in the UI, not vanish silently.
             return { id: f.replace(/\.json$/, ''), name: `⚠ unparseable: ${f}`, kind: 'broken', modified: 0 }
@@ -85,18 +99,18 @@ function configApiPlugin() {
       return send(res, 200, index)
     }
 
-    if (!id || !ID_RE.test(id)) return send(res, 400, { error: `bad config id: ${id}` })
-    const file = path.join(CONFIG_DIR, `${id}.json`)
+    if (!id || !ID_RE.test(id)) return send(res, 400, { error: `bad id: ${id}` })
+    const file = path.join(dir, `${id}.json`)
 
     if (req.method === 'GET') {
-      if (!fs.existsSync(file)) return send(res, 404, { error: `no config: ${id}` })
+      if (!fs.existsSync(file)) return send(res, 404, { error: `no ${parts[1].replace(/s$/, '')}: ${id}` })
       return send(res, 200, JSON.parse(fs.readFileSync(file, 'utf8')))
     }
 
     if (req.method === 'PUT') {
       const body = JSON.parse(await readBody(req))
       if (body.id !== id) return send(res, 400, { error: `body.id "${body.id}" ≠ url id "${id}"` })
-      fs.mkdirSync(CONFIG_DIR, { recursive: true })
+      fs.mkdirSync(dir, { recursive: true })
       fs.writeFileSync(file, JSON.stringify(body, null, 2) + '\n')
       return send(res, 200, { ok: true, id })
     }
@@ -120,6 +134,88 @@ function configApiPlugin() {
   }
 }
 
+/**
+ * Dev-server-only progress API. Scores the PLAN tree (viz/trees/projected.mmd) at every commit
+ * that touched it, plus the working tree, so the dashboard can show a total and a per-commit
+ * delta. Scoring lives in viz/progress.js and is shared with the browser — one rule, not two.
+ *
+ *   GET /api/progress → { head, dirty, current, history: [{sha, date, subject, pct}], delta }
+ *
+ * Git is read-only here: log, show, status. It never writes.
+ */
+const TREE_FILE = 'viz/trees/projected.mmd'
+
+function git(args) {
+  return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
+}
+
+function progressApiPlugin() {
+  let cache = null // { key, payload } — keyed on HEAD sha + working-tree mtime
+
+  function build() {
+    const workingSrc = fs.readFileSync(path.join(ROOT, TREE_FILE), 'utf8')
+    const current = scoreTree(workingSrc)
+
+    let head = null
+    let dirty = false
+    const history = []
+
+    try {
+      const [sha, date, subject] = git(['log', '-1', '--format=%H%x1f%aI%x1f%s']).trim().split('\x1f')
+      head = { sha: sha.slice(0, 7), date, subject }
+      dirty = git(['status', '--porcelain', '--', TREE_FILE]).trim().length > 0
+
+      const log = git(['log', '--reverse', '--format=%H%x1f%aI%x1f%s', '--', TREE_FILE]).trim()
+      for (const line of log ? log.split('\n') : []) {
+        const [full, at, subj] = line.split('\x1f')
+        let src
+        try {
+          src = git(['show', `${full}:${TREE_FILE}`])
+        } catch {
+          continue // the file did not exist at that commit
+        }
+        const score = scoreTree(src)
+        // A commit where the file parsed to zero checkboxes is not a 0% milestone — it is a
+        // file that was not this tree yet. Plotting it would invent a cliff that never happened.
+        if (!score.total) continue
+        history.push({ sha: full.slice(0, 7), date: at, subject: subj, ...pick(score) })
+      }
+    } catch (err) {
+      // Not a git repo, or git is missing. The live score still works; history just stays empty.
+      return { ok: true, git: false, reason: String(err?.message ?? err), current: pick(current), history: [], head, dirty, delta: null }
+    }
+
+    const last = history[history.length - 1]
+    return {
+      ok: true,
+      git: true,
+      head,
+      dirty,
+      current: pick(current),
+      history,
+      delta: last ? current.pct - last.pct : null,
+    }
+  }
+
+  const pick = (s) => ({ pct: s.pct, weighted: s.weighted, total: s.total, byStatus: s.byStatus })
+
+  return {
+    name: 'ablepad-progress-api',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url.startsWith('/api/progress')) return next()
+        try {
+          const key = fs.statSync(path.join(ROOT, TREE_FILE)).mtimeMs + ':' + git(['rev-parse', 'HEAD']).trim()
+          if (!cache || cache.key !== key) cache = { key, payload: build() }
+          send(res, 200, cache.payload)
+        } catch (err) {
+          send(res, 500, { ok: false, error: String(err?.message ?? err) })
+        }
+      })
+    },
+  }
+}
+
 export default defineConfig({
   root: 'viz',
   // host: true → bind 0.0.0.0 so other machines on the LAN (laptop, the Beelink at the
@@ -137,5 +233,7 @@ export default defineConfig({
   },
   // .mmd is not a known text extension to Vite — declare it so ?raw imports work.
   assetsInclude: ['**/*.mmd'],
-  plugins: [configApiPlugin()],
+  // Order matters: the config API claims every /api/ path, so the progress middleware must be
+  // registered ahead of it or its requests get answered with "unknown endpoint".
+  plugins: [progressApiPlugin(), configApiPlugin()],
 })

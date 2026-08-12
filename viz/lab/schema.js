@@ -18,6 +18,9 @@
 
 export const SCHEMA_VERSION = 1
 
+/** One id rule for every saved entity — config files and animation files alike. */
+const ID_RE = /^[a-z0-9][a-z0-9_-]*$/
+
 /* ═══════════════════════════════════════════════════════════════ pad addressing */
 
 /** All 81 addressable LEDs, bottom-left to top-right, as string ids ("11"…"99"). */
@@ -107,6 +110,115 @@ export const ACTIONS = {
 
 export const ACTION_TYPES = Object.keys(ACTIONS)
 
+/* ═══════════════════════════════════════════════════════════════ animations
+   Animations are their own saved entities (<repo>/animations/*.json) referenced
+   by configs — never embedded, so one rain is reusable on every screen.
+
+   Two engines:
+     'generator' — procedural; a type from GENERATORS plus params. The math lives
+                   in anim.js (JS) and later launchpad/animations.py (Python) —
+                   both implement THIS catalogue, which is why it lives here.
+     'frames'    — hand-drawn keyframes painted in the Anim editor.
+
+   A config consumes animations through two slots:
+     intro  — plays once on mode entry, full-cover; any press skips it.
+     during — loops while the mode is showing, composited with the pads:
+              layer 'under' (bound pads win — the default) or 'over'. */
+
+export const ANIM_ENGINES = ['generator', 'frames']
+export const ANIM_SLOTS = ['intro', 'during']
+export const ANIM_LAYERS = ['under', 'over']
+
+/** Frame pads are snapshots — a frame holding flash/pulse makes no sense. */
+export const FRAME_LED_TYPES = ['off', 'static', 'rgb']
+
+/** Colour policy shared by every generator: random per element (no picking — the
+    user's stated preference), or one fixed hue. Hue not palette: generators emit
+    RGB SysEx, so they never depend on the UNVERIFIED palette table. */
+const COLOR_PARAMS = {
+  colorMode: {
+    type: 'select',
+    label: 'Colours',
+    default: 'random',
+    options: [
+      { value: 'random', label: 'random per element' },
+      { value: 'hue', label: 'fixed hue' },
+    ],
+  },
+  hue: { type: 'number', label: 'Hue (0–359)', min: 0, max: 359, step: 1, default: 0 },
+}
+const SEED_PARAM = {
+  seed: { type: 'number', label: 'Seed', min: 0, max: 99999, step: 1, default: 1 },
+}
+
+/**
+ * The generator catalogue — same philosophy as ACTIONS: add an entry here plus its
+ * frame function in anim.js and the inspector grows the form; no panel code changes.
+ * Param specs use the exact shapes the inspector already renders for actions.
+ */
+export const GENERATORS = {
+  RAIN: {
+    label: 'Rain (top-down)',
+    params: {
+      density: { type: 'number', label: 'Drops', min: 1, max: 24, step: 1, default: 6 },
+      speed: { type: 'number', label: 'Speed (rows/s)', min: 1, max: 20, step: 1, default: 8 },
+      tail: { type: 'number', label: 'Tail (rows)', min: 1, max: 8, step: 1, default: 3 },
+      ...COLOR_PARAMS,
+      ...SEED_PARAM,
+    },
+  },
+  PULSE_WAVE: {
+    label: 'Pulse wave (directional)',
+    params: {
+      direction: {
+        type: 'select',
+        label: 'Direction',
+        default: 'random',
+        options: [
+          { value: 'random', label: 'random per sweep' },
+          { value: 'up', label: 'up' },
+          { value: 'down', label: 'down' },
+          { value: 'left', label: 'left' },
+          { value: 'right', label: 'right' },
+        ],
+      },
+      period_ms: { type: 'number', label: 'Sweep (ms)', min: 300, max: 6000, step: 100, default: 1400 },
+      width: { type: 'number', label: 'Band width', min: 1, max: 6, step: 0.5, default: 2.5 },
+      ...COLOR_PARAMS,
+      ...SEED_PARAM,
+    },
+  },
+  SPIN_SQUARE: {
+    label: 'Spinning square',
+    params: {
+      size: {
+        type: 'select',
+        label: 'Size',
+        default: 6,
+        options: [
+          { value: 4, label: '4 × 4' },
+          { value: 6, label: '6 × 6' },
+          { value: 8, label: '8 × 8' },
+        ],
+      },
+      period_ms: { type: 'number', label: 'Revolution (ms)', min: 400, max: 8000, step: 100, default: 1600 },
+      tail: { type: 'number', label: 'Tail (cells)', min: 1, max: 16, step: 1, default: 6 },
+      ...COLOR_PARAMS,
+      ...SEED_PARAM,
+    },
+  },
+}
+
+export const GENERATOR_TYPES = Object.keys(GENERATORS)
+
+/** Catalogue defaults for a generator type — sparse files render deterministically. */
+export function generatorDefaults(type) {
+  const out = {}
+  for (const [key, spec] of Object.entries(GENERATORS[type]?.params ?? {}))
+    if (spec.default !== undefined) out[key] = spec.default
+  return out
+}
+
 /* ═══════════════════════════════════════════════════════════════════ factories */
 
 /** A pad that does nothing and shows nothing — the state every pad starts in. */
@@ -131,10 +243,31 @@ export function defaultConfig(id, name, kind = 'mode') {
     description: '',
     background: { type: 'off' }, // painted on every pad that has no explicit binding
     pads: {}, // sparse: only pads that differ from defaultPad()
+    animations: { intro: null, during: null }, // { ref, layer? } per slot — see ANIM_SLOTS
     transitions: [], // [{ on: 'ACTION or event name', to: 'config-id' }] — flow edges
     notes: '',
     meta: { flowPos: null }, // {x, y} in the flow view; null = auto-place
   }
+}
+
+/**
+ * A fresh animation. Generators start as PULSE_WAVE with catalogue defaults (random
+ * directions, random colours — zero decisions before something moves); frames start
+ * with one empty frame to paint into.
+ */
+export function defaultAnimation(id, name, engine = 'generator') {
+  const anim = {
+    schemaVersion: SCHEMA_VERSION,
+    id,
+    name,
+    engine,
+    loop: true,
+    duration_ms: null, // generators: null = endless (fine for 'during', wrong for 'intro')
+    notes: '',
+  }
+  if (engine === 'generator') anim.generator = { type: 'PULSE_WAVE', params: generatorDefaults('PULSE_WAVE') }
+  else anim.frames = [{ duration_ms: 250, pads: {} }]
+  return anim
 }
 
 /* ═══════════════════════════════════════════════════════════════════ validation */
@@ -161,9 +294,28 @@ export function validateConfig(config) {
   if (!config || typeof config !== 'object') return { ok: false, errors: ['config is not an object'] }
   if (config.schemaVersion !== SCHEMA_VERSION)
     errors.push(`schemaVersion ${config.schemaVersion} ≠ ${SCHEMA_VERSION}`)
-  if (!/^[a-z0-9][a-z0-9_-]*$/.test(config.id ?? '')) errors.push(`bad id "${config.id}"`)
+  if (!ID_RE.test(config.id ?? '')) errors.push(`bad id "${config.id}"`)
   if (!config.name) errors.push('name is empty')
   checkLed(config.background, 'background', errors)
+
+  // animations block is OPTIONAL — pre-animation config files stay valid untouched.
+  // Ref existence is a library question, not a shape question: the inspector warns
+  // on dangling refs, the renderer skips them; neither side hard-fails.
+  if (config.animations != null) {
+    if (typeof config.animations !== 'object') errors.push('animations: not an object')
+    else
+      for (const [slot, binding] of Object.entries(config.animations)) {
+        if (!ANIM_SLOTS.includes(slot)) {
+          errors.push(`animations: unknown slot "${slot}"`)
+          continue
+        }
+        if (binding == null) continue // slot present but empty — fine
+        if (typeof binding.ref !== 'string' || !ID_RE.test(binding.ref))
+          errors.push(`animations.${slot}: bad ref "${binding.ref}"`)
+        if (binding.layer != null && !ANIM_LAYERS.includes(binding.layer))
+          errors.push(`animations.${slot}: layer must be ${ANIM_LAYERS.join(' | ')}`)
+      }
+  }
 
   for (const [id, pad] of Object.entries(config.pads ?? {})) {
     if (!PAD_IDS.includes(id)) {
@@ -184,6 +336,55 @@ export function validateConfig(config) {
   for (const [i, t] of (config.transitions ?? []).entries()) {
     if (!t || typeof t.on !== 'string' || typeof t.to !== 'string')
       errors.push(`transition ${i}: needs { on: string, to: string }`)
+  }
+
+  return { ok: errors.length === 0, errors }
+}
+
+/**
+ * Validate an animation file. Same contract as validateConfig: the Lab refuses to
+ * save what the Python player would refuse to load.
+ */
+export function validateAnimation(anim) {
+  const errors = []
+  if (!anim || typeof anim !== 'object') return { ok: false, errors: ['animation is not an object'] }
+  if (anim.schemaVersion !== SCHEMA_VERSION)
+    errors.push(`schemaVersion ${anim.schemaVersion} ≠ ${SCHEMA_VERSION}`)
+  if (!ID_RE.test(anim.id ?? '')) errors.push(`bad id "${anim.id}"`)
+  if (!anim.name) errors.push('name is empty')
+  if (!ANIM_ENGINES.includes(anim.engine)) errors.push(`unknown engine "${anim.engine}"`)
+  if (typeof anim.loop !== 'boolean') errors.push('loop must be true or false')
+  if (anim.duration_ms != null && !(Number.isInteger(anim.duration_ms) && anim.duration_ms > 0))
+    errors.push(`duration_ms must be a positive integer or null, got ${anim.duration_ms}`)
+
+  if (anim.engine === 'generator') {
+    const type = anim.generator?.type
+    const spec = GENERATORS[type]
+    if (!spec) errors.push(`unknown generator "${type}"`)
+    else
+      for (const [key, value] of Object.entries(anim.generator.params ?? {})) {
+        const param = spec.params[key]
+        if (!param || value === undefined) continue // unknown/cleared params are dropped, not fatal
+        if (param.type === 'number' && !(typeof value === 'number' && value >= param.min && value <= param.max))
+          errors.push(`generator.${key}: must be ${param.min}–${param.max}, got ${value}`)
+        if (param.type === 'select' && !param.options.some((o) => o.value === value))
+          errors.push(`generator.${key}: "${value}" is not an option`)
+      }
+  }
+
+  if (anim.engine === 'frames') {
+    if (!Array.isArray(anim.frames) || !anim.frames.length) errors.push('frames: needs at least one frame')
+    else
+      anim.frames.forEach((frame, i) => {
+        if (!(Number.isInteger(frame.duration_ms) && frame.duration_ms > 0))
+          errors.push(`frame ${i}: duration_ms must be a positive integer`)
+        for (const [id, led] of Object.entries(frame.pads ?? {})) {
+          if (!PAD_IDS.includes(id)) errors.push(`frame ${i}: pad "${id}" is not a valid index`)
+          else if (!FRAME_LED_TYPES.includes(led?.type))
+            errors.push(`frame ${i} pad ${id}: frames allow only ${FRAME_LED_TYPES.join('/')}`)
+          else checkLed(led, `frame ${i} pad ${id}`, errors)
+        }
+      })
   }
 
   return { ok: errors.length === 0, errors }

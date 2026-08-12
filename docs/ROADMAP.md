@@ -396,7 +396,17 @@ Beelink's adapter supports it before committing to the design.
 │   └── was Balanced with min processor state 5% — cores downclocking between
 │       audio buffers, the classic dropout cause on Intel N-series
 │   └── scheme changes do NOT carry settings over; re-apply if the scheme changes
-□ Defender exclusions, and disable PresentMonService / IntelGraphicsSoftware startup
+■ Defender exclusions + startup trimming — DONE 2026-08-12
+│   └── excluded C:\LiveRig, C:\ProgramData\Ableton, VST3, and the Ableton process.
+│       Real-time monitoring deliberately left ON everywhere else
+│   └── PresentMonSharedService and IntelGraphicsSoftwareService disabled
+│   └── Intel Graphics Run entry removed, backed up to
+│       HKLM\SOFTWARE\ablepad-disabled-startup
+│   └── tools/results/phase7-hardening.txt
+□ OneDrive: NAM library is duplicated into OneDrive\Documents\namirs. On an
+│   offline rig, Files On-Demand placeholders would fail to load mid-set.
+│   Point the plugin at C:\LiveRig\namirs and get it out of OneDrive
+□ Notifications, update reboots, remaining startup apps disabled
 □ Notifications, update reboots, startup apps disabled
 □ Cold boot with monitor attached → rig reaches Set Browser unaided
 □ Cold boot with NO monitor/keyboard/mouse → same result

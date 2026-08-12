@@ -1,0 +1,67 @@
+# Recorded 2026-08-12, Beelink RIG, over SSH
+# Phase 7 groundwork done early because it was making Phase 0 look worse than it is.
+
+# --- POWER (applied earlier the same day) ---
+scheme: 'High performance (6bdc3f41-4e92-4e22-830c-30f084a6616d)'
+processor: { min_state_ac: 100, max_state_ac: 100 }
+sleep:     { standby_ac: 0, hibernate_ac: 0, video_ac: 0, disk_ac: 0 }
+usb:       { selective_suspend_ac: 0 }
+
+# --- DEFENDER EXCLUSIONS ---
+# Real-time scanning on audio content is a documented cause of buffer overruns:
+# Defender opens a file mid-playback and the audio thread blocks on I/O it did
+# not schedule. Average CPU stays low; you still hear a click.
+defender:
+  realtime_monitoring: ON        # deliberately still on. Only these are excluded.
+  exclusion_paths:
+    - 'C:\LiveRig'                            # NAM models, IRs, sets, the venv
+    - 'C:\ProgramData\Ableton'                # the install itself
+    - 'C:\Program Files\Common Files\VST3'    # plugins loaded into the audio thread
+  exclusion_processes:
+    - 'Ableton Live 12 Suite.exe'
+#
+# THE TRADEOFF, STATED: a process exclusion means nothing Ableton opens is scanned.
+# That is the point (plugins, samples, models) and it is also the risk. NAM models
+# and plugin installers pulled off the internet should be scanned BEFORE they land
+# in C:\LiveRig, because once there they never will be.
+
+# --- SERVICES DISABLED ---
+#   PresentMonSharedService        was Running/Automatic -> Stopped/Disabled
+#   IntelGraphicsSoftwareService   was Running/Automatic -> Stopped/Disabled
+# Neither has any role on an audio appliance. 364 and 149 CPU-seconds respectively
+# at the time of survey.
+
+# --- STARTUP ENTRY REMOVED ---
+#   HKLM\SOFTWARE\WOW6432Node\...\Run
+#     'Intel(R) Graphics Software' = "C:\Program Files\Intel\Intel Graphics Software\IntelGraphicsSoftware.exe" -s
+#   Backed up verbatim to HKLM\SOFTWARE\ablepad-disabled-startup. To restore, copy
+#   the value back into the Run key.
+#
+# GOTCHA WORTH REMEMBERING: that value name contains a REGISTERED TRADEMARK sign
+# (UTF-8 C2 AE). Sent over SSH through base64/UTF-16 it renders as "Intelr", so an
+# exact-string match silently found nothing while the entry sat there in plain
+# sight. Match registry value names by PATTERN, not equality.
+
+# --- LEFT ALONE, DELIBERATELY ---
+#   OneDrive              (HKCU Run + 2 scheduled tasks)  -- see the warning below
+#   MicrosoftEdgeAutoLaunch (HKCU Run)                    -- Edge starts with the session
+#   MicrosoftEdgeUpdateTaskMachineCore                    -- running
+#   USER_ESRV_SVC_QUEENCREEK                              -- Intel telemetry
+#   SecurityHealth, RtkAudUService, RTHDVCPL              -- leave; audio/security
+# These are Matt's machine to decide on, not mine.
+
+# ############################################################################
+# WARNING: THE NAM LIBRARY EXISTS TWICE, AND ONE COPY IS IN ONEDRIVE
+# ############################################################################
+#   C:\LiveRig\namirs                         302 .nam   <- correct location
+#   C:\Users\rigma\OneDrive\Documents\namirs  302 .nam   <- cloud-synced
+#
+# Why this is a gig risk, not just clutter:
+#   OneDrive Files On-Demand can leave files as PLACEHOLDERS -- a stub that
+#   downloads on first read. The rig is specified to run with NO INTERNET. A
+#   plugin trying to load a dehydrated .nam on a disconnected machine gets a
+#   failure or a hang, mid-set, with no screen to explain why.
+#
+# The fix is to point the plugin at C:\LiveRig\namirs and get the library out of
+# OneDrive entirely. Verify inside the NAM/Gateway plugin which path it is
+# actually loading from -- that is the one that matters, not which copy exists.

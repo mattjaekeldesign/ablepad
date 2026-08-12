@@ -499,16 +499,39 @@ class LaunchpadBench:
         assert self.outport is not None
         self.outport.send(message)
 
-    def wait_for_event(self, timeout_s: float | None = None) -> "mido.Message | None":
-        """Block for one note/CC message. Returns None on timeout."""
+    def wait_for_event(
+        self, timeout_s: float | None = None, presses_only: bool = False
+    ) -> "mido.Message | None":
+        """
+        Block for one note/CC message. Returns None on timeout.
+
+        presses_only skips releases. The device signals a release as note_on with
+        velocity 0 (p.6), so "any note_on" and "a press" are NOT the same thing --
+        a release still in the queue reads as a press on the next position. That
+        never bit us in the 2026-08-12 sweep (the two mismatches there were a
+        misplaced finger), but the ambiguity is real and one-line to remove.
+        """
         assert self.inport is not None
         deadline = None if timeout_s is None else time.monotonic() + timeout_s
         while deadline is None or time.monotonic() < deadline:
             for message in self.inport.iter_pending():
-                if message.type in ("note_on", "note_off", "control_change"):
-                    return message
+                if message.type not in ("note_on", "note_off", "control_change"):
+                    continue
+                if presses_only:
+                    if message.type == "note_off":
+                        continue
+                    value = getattr(message, "velocity", None)
+                    if value is None:
+                        value = getattr(message, "value", 0)
+                    if not value:
+                        continue
+                return message
             time.sleep(0.005)
         return None
+
+    def drain(self) -> None:
+        """Discard everything queued. Aftertouch makes one press many messages."""
+        self._drain()
 
 
 # ---------------------------------------------------------------------------

@@ -178,10 +178,12 @@ tools/
 │   □ Brightness set for stage             — SysEx 08h from rig.yaml
 ■ Programmer Mode SysEx confirmed against the Reference Guide   ← DONE, bytes were correct
 □ Programmer Mode entry verified in code
-■ CC frame recorded — DONE 2026-08-12, tools/results/grid-frame.txt
-│   └── top row 91-98 and right column 19..89, 16/16 exact. Logo 99 = LED only, no button
-□ Full 8×8 interior sweep → commit as launchpad/grid.py
-│   └── 3 corners from the manual + 7 interior notes measured; no contradictions yet
+■ Full 9×9 map recorded — DONE 2026-08-12 → committed as launchpad/grid.py
+│   └── all 81 positions swept. 80 pressable, every one reporting a number
+│       identical to the LED index that lit it. Zero unexplained mismatches
+│   └── evidence: tools/results/grid-{frame,8x8,retest}.txt
+│   └── the map is an EQUATION, (row*10)+col, not a lookup table
+│   └── logo 99 lights but has NO button — nothing may bind to it
 ■ Colour indices in use recorded — DONE 2026-08-12, 8/8 confirmed by eye
 │   └── 0 off · 5 red · 13 yellow · 19 green · 21 bright green · 23 dim green
 │       · 37 cyan · 45 blue. All match the Mini MK3 candidate table

@@ -34,13 +34,15 @@ WHAT IS ALREADY KNOWN
 MODES
     --sweep  (default) guided, one position at a time, full provenance
     --free   freeform capture; press anything, everything is logged
-    --frame  sweep only the 17 outer controls -- the actual unknowns, ~2 minutes
+    --frame  sweep only the 17 outer controls
+    --grid   sweep only the 64 interior pads
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+import time
 from dataclasses import dataclass
 
 from _bench import (
@@ -127,7 +129,8 @@ def sweep(session, indices: tuple[int, ...], observations: list[Observation]) ->
             continue
 
         print(f"  [{count}/{total}] lit LED index {index} -- press it", end="", flush=True)
-        message = session.wait_for_event(timeout_s=PRESS_TIMEOUT_S)
+        session.drain()  # clear any release/aftertouch left by the previous pad
+        message = session.wait_for_event(timeout_s=PRESS_TIMEOUT_S, presses_only=True)
         session.send(led_static(index, 0))
 
         if message is None:
@@ -144,9 +147,11 @@ def sweep(session, indices: tuple[int, ...], observations: list[Observation]) ->
         print(observation.describe())
         observations.append(observation)
 
-        # The device sends note-on velocity 0 for release (p.6). Swallow it so the
-        # next position does not capture the previous release as its press.
-        session.wait_for_event(timeout_s=0.4)
+        # Let the release and its aftertouch burst arrive, then bin the lot. With
+        # aftertouch on, one press is a dozen messages -- swallowing a single event
+        # is not enough.
+        time.sleep(0.35)
+        session.drain()
 
 
 def free_capture(session, rec: Recorder) -> None:
@@ -259,6 +264,8 @@ def main() -> int:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--sweep", action="store_true", help="guided sweep, all 81 (default)")
     group.add_argument("--frame", action="store_true", help="sweep only the 17 outer controls")
+    group.add_argument("--grid", action="store_true", help="sweep only the 64 interior pads")
+    parser.add_argument("--only", help="comma-separated LED indices, e.g. 11,12,13")
     group.add_argument("--free", action="store_true", help="freeform capture")
     args = parser.parse_args()
 
@@ -276,8 +283,15 @@ def main() -> int:
             rec.save("grid-freeform.txt")
             return 0
 
-        indices = FRAME_INDICES if args.frame else ALL_LED_INDICES
-        scope = "outer frame only" if args.frame else "full 9x9"
+        if args.only:
+            indices = tuple(int(x) for x in args.only.split(","))
+            scope = f"specific indices {list(indices)}"
+        elif args.frame:
+            indices, scope = FRAME_INDICES, "outer frame only"
+        elif args.grid:
+            indices, scope = PAD_GRID_INDICES, "8x8 interior pads only"
+        else:
+            indices, scope = ALL_LED_INDICES, "full 9x9"
         rec.add(f"# Scope: {scope} ({len(indices)} positions)")
         rec.add()
 
@@ -292,7 +306,9 @@ def main() -> int:
     if observations:
         analyse(rec, observations)
         emit_literal(rec, observations)
-        rec.save("grid-frame.txt" if args.frame else "grid-full.txt")
+        rec.save("grid-retest.txt" if args.only else
+                 "grid-frame.txt" if args.frame else
+                 "grid-8x8.txt" if args.grid else "grid-full.txt")
     return 0
 
 

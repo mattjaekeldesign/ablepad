@@ -1,0 +1,45 @@
+# Recorded by tools/launchpad_note_tester.py
+# Date:     2026-08-11
+# Machine:  Windows 11
+# Backend:  mido.backends.rtmidi
+# Source:   physical measurement against the hardware
+#
+# Paste into the target module WITH this header. It is the provenance.
+
+# Scope: specific indices [11, 12, 13] (3 positions)
+
+# --- ANALYSIS ---
+#   positions swept:  3
+#   captured:         3
+#   LED-only (no button under it): 0
+#   skipped/timeout:  0
+#   index mismatches: 0
+
+#   sends NOTE (3): [11, 12, 13]
+#   sends CC   (0): []
+
+
+# --- PASTE INTO launchpad/grid.py ---
+
+# Measured, not inferred. Every value below was produced by lighting an
+# LED index and recording what pressing that control actually sent.
+
+SENDS_NOTE: frozenset[int] = frozenset({
+    11, 12, 13
+})
+
+SENDS_CC: frozenset[int] = frozenset({
+    
+})
+
+# LED index -> (message type, number). Identical in every verified case
+# means the (row * 10) + column rule holds and grid.py can compute it.
+OBSERVED: dict[int, tuple[str, int]] = {
+    11: ('note_on', 11),
+    12: ('note_on', 12),
+    13: ('note_on', 13),
+}
+
+# In Programmer mode every control ACCEPTS either note or CC; the split
+# above is only what the device SENDS on press (p.10). read_events() must
+# handle both. set_led() may use either.

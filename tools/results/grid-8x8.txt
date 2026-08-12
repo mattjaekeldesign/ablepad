@@ -1,0 +1,112 @@
+# Recorded by tools/launchpad_note_tester.py
+# Date:     2026-08-11
+# Machine:  Windows 11
+# Backend:  mido.backends.rtmidi
+# Source:   physical measurement against the hardware
+#
+# Paste into the target module WITH this header. It is the provenance.
+
+# Scope: 8x8 interior pads only (64 positions)
+
+# --- ANALYSIS ---
+#   positions swept:  64
+#   captured:         64
+#   LED-only (no button under it): 0
+#   skipped/timeout:  0
+#   index mismatches: 2
+
+#   MISMATCHES -- the LED index and the input number differ. This
+#   contradicts p.15's claim that LED indices always follow
+#   Programmer-mode numbering. Record it, do not resolve it silently:
+#     LED 12 -> note  11 vel/val  32   <- MISMATCH, LED index is 12
+#     LED 13 -> note  12 vel/val  45   <- MISMATCH, LED index is 13
+
+#   sends NOTE (64): [11, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 45, 46, 47, 48, 51, 52, 53, 54, 55, 56, 57, 58, 61, 62, 63, 64, 65, 66, 67, 68, 71, 72, 73, 74, 75, 76, 77, 78, 81, 82, 83, 84, 85, 86, 87, 88]
+#   sends CC   (0): []
+
+
+# --- PASTE INTO launchpad/grid.py ---
+
+# Measured, not inferred. Every value below was produced by lighting an
+# LED index and recording what pressing that control actually sent.
+
+SENDS_NOTE: frozenset[int] = frozenset({
+    11, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 45, 46, 47, 48, 51, 52, 53, 54, 55, 56, 57, 58, 61, 62, 63, 64, 65, 66, 67, 68, 71, 72, 73, 74, 75, 76, 77, 78, 81, 82, 83, 84, 85, 86, 87, 88
+})
+
+SENDS_CC: frozenset[int] = frozenset({
+    
+})
+
+# LED index -> (message type, number). Identical in every verified case
+# means the (row * 10) + column rule holds and grid.py can compute it.
+OBSERVED: dict[int, tuple[str, int]] = {
+    11: ('note_on', 11),
+    12: ('note_on', 11),
+    13: ('note_on', 12),
+    14: ('note_on', 14),
+    15: ('note_on', 15),
+    16: ('note_on', 16),
+    17: ('note_on', 17),
+    18: ('note_on', 18),
+    21: ('note_on', 21),
+    22: ('note_on', 22),
+    23: ('note_on', 23),
+    24: ('note_on', 24),
+    25: ('note_on', 25),
+    26: ('note_on', 26),
+    27: ('note_on', 27),
+    28: ('note_on', 28),
+    31: ('note_on', 31),
+    32: ('note_on', 32),
+    33: ('note_on', 33),
+    34: ('note_on', 34),
+    35: ('note_on', 35),
+    36: ('note_on', 36),
+    37: ('note_on', 37),
+    38: ('note_on', 38),
+    41: ('note_on', 41),
+    42: ('note_on', 42),
+    43: ('note_on', 43),
+    44: ('note_on', 44),
+    45: ('note_on', 45),
+    46: ('note_on', 46),
+    47: ('note_on', 47),
+    48: ('note_on', 48),
+    51: ('note_on', 51),
+    52: ('note_on', 52),
+    53: ('note_on', 53),
+    54: ('note_on', 54),
+    55: ('note_on', 55),
+    56: ('note_on', 56),
+    57: ('note_on', 57),
+    58: ('note_on', 58),
+    61: ('note_on', 61),
+    62: ('note_on', 62),
+    63: ('note_on', 63),
+    64: ('note_on', 64),
+    65: ('note_on', 65),
+    66: ('note_on', 66),
+    67: ('note_on', 67),
+    68: ('note_on', 68),
+    71: ('note_on', 71),
+    72: ('note_on', 72),
+    73: ('note_on', 73),
+    74: ('note_on', 74),
+    75: ('note_on', 75),
+    76: ('note_on', 76),
+    77: ('note_on', 77),
+    78: ('note_on', 78),
+    81: ('note_on', 81),
+    82: ('note_on', 82),
+    83: ('note_on', 83),
+    84: ('note_on', 84),
+    85: ('note_on', 85),
+    86: ('note_on', 86),
+    87: ('note_on', 87),
+    88: ('note_on', 88),
+}
+
+# In Programmer mode every control ACCEPTS either note or CC; the split
+# above is only what the device SENDS on press (p.10). read_events() must
+# handle both. set_led() may use either.

@@ -112,3 +112,57 @@ defender:
 #     MicrosoftEdgeUpdateTaskMachineCore      (Edge updater, still running)
 #     USER_ESRV_SVC_QUEENCREEK                (Intel telemetry)
 #     SecurityHealth / RtkAudUService / RTHDVCPL
+
+# ============================================================================
+# UPDATE — Documents un-redirected out of OneDrive, 2026-08-12
+# ============================================================================
+#
+# Moved, with Ableton closed:
+#     C:\Users\rigma\OneDrive\Documents\{Ableton, Max 9, namirs}
+#  -> C:\Users\rigma\Documents\
+#
+# Registry repointed:
+#     User Shell Folders\Personal = %USERPROFILE%\Documents   (ExpandString)
+#     Shell Folders\Personal      = C:\Users\rigma\Documents
+#
+# Desktop and Pictures deliberately left redirected -- only Documents was asked for.
+# Left behind in OneDrive\Documents: desktop.ini only.
+#
+# VERIFIED after the move:
+#     namirs   317 files / 174.1 MB   -- byte-identical count to C:\LiveRig\namirs
+#     Ableton  3 empty subfolders (Cloud Manager, Factory Packs, Live Recordings)
+#     Max 9    empty
+
+# --- ABLETON DOES NOT NEED RE-POINTING (correcting an earlier claim) ---
+# I said the User Library path would need re-setting in Preferences > Library.
+# Reading the actual config says otherwise:
+#     C:\Users\rigma\AppData\Roaming\Ableton\Live 12.4.3\Preferences\Library.cfg
+#     -> <UserLibrary />          EMPTY, i.e. "use the default"
+#     -> no occurrence of 'OneDrive' anywhere in the file
+# The default resolves through the Documents shell folder, which now points at
+# C:\Users\rigma\Documents -- exactly where the Ableton folder was moved to. So it
+# should resolve correctly with no intervention.
+# INFERENCE, not proof: confirm on next launch that the browser shows a User
+# Library and Live Recordings lands in the new path.
+
+# --- ONE THING I CANNOT ACCOUNT FOR ---
+# The pre-move survey reported Documents\Ableton as "3 files, 0.5 MB". After the
+# move it holds 3 folders and ZERO files. Move-Item reported no failures,
+# OneDrive\Documents is empty but for desktop.ini, and the Recycle Bin holds
+# nothing Ableton-related.
+# Most likely those were transient files Live wrote while running (it was open
+# during the survey, closed for the move) and cleaned up on exit -- Cloud Manager
+# and Live Recordings are exactly the folders it uses for that. That is a
+# plausible explanation, not evidence. Recorded rather than smoothed over.
+
+# --- RECYCLE BIN, for the record ---
+#     Audient, nam, EVO-v4.4.0a, EVO-v4.4.0a (1)
+# 'nam' is the original Downloads copy, deleted after it was duplicated to
+# C:\LiveRig\namirs and Documents\namirs. Nothing unexpected.
+
+# --- STILL TWO COPIES OF THE LIBRARY ---
+#     C:\LiveRig\namirs                 317 files
+#     C:\Users\rigma\Documents\namirs   317 files
+# Identical today. They will not stay identical. Confirm which one the NAM/Gateway
+# plugin loads from and delete the other; C:\LiveRig is the copy that should win,
+# since that tree is meant to be the rebuildable definition of the rig.

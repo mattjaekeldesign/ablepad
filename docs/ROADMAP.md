@@ -407,9 +407,12 @@ Beelink's adapter supports it before committing to the design.
 │   backed up, six OneDrive scheduled tasks disabled. HKCU Run key now empty.
 │   Placeholder audit taken first: 1 of 329 files was cloud-only, and it was the
 │   OneDrive welcome PDF — nothing was stranded
-□ Known Folder Move still redirects Documents/Desktop/Pictures into the OneDrive
-│   directory. Harmless with sync off, but Ableton's User Library lives at
-│   C:\Users\rigma\OneDrive\Documents\Ableton. Decide whether to un-redirect
+■ Documents un-redirected out of OneDrive — DONE 2026-08-12. Ableton, Max 9 and
+│   namirs moved to C:\Users\rigma\Documents; shell folder repointed
+│   └── Ableton's Library.cfg has <UserLibrary /> empty, i.e. default, which now
+│       resolves to the new path — no re-pointing expected. Confirm on next launch
+□ Desktop and Pictures are still redirected into OneDrive. Decide whether they
+│   matter for a rig (nothing rig-critical lives in either today)
 □ Confirm which namirs path the NAM/Gateway plugin actually loads from —
 │   C:\LiveRig\namirs is the copy that should win
 □ Notifications, update reboots, remaining startup apps disabled

@@ -147,7 +147,7 @@ Python fixes it.
 │   └── GUI-ONLY: nothing persists these where a script can reach them, so they
 │       must be frozen into the system image. EVO reference open item 6
 │   └── tools/results/phase0-audio-settings.txt
-□ Round-trip latency: 256 @ 44.1k holds cleanly, judged to sound great.
+■ Round-trip latency: 256 @ 44.1k holds cleanly under a heavy chain, 15 min.
 │   └── derived estimate ~15 ms (was ~27 ms at 512)
 │   └── STILL OWED: read Ableton's "Overall Latency" field and record the real
 │       number. The estimate is arithmetic from the manual, not a measurement
@@ -165,7 +165,13 @@ Python fixes it.
 ```
 
 **Risk: Low.** Manual work only.
-**Exit test:** You can play guitar through Ableton for 30 minutes with no dropouts.
+**Exit test: PARTIAL — 15 of 30 minutes, 2026-08-12.** Heavy NAM + IR chain, no
+crackles, CPU clock held at ~3.1 GHz with no throttling, EVO and Launchpad present
+throughout. Stopped early by choice; a re-test is owed with the real set anyway.
+
+NOT marked complete: thermal throttling on this N150 would typically appear at
+15–25 minutes, so the run stopped exactly where the interesting failure begins.
+See tools/results/phase0-endurance-notes.md.
 
 ---
 

@@ -1,7 +1,8 @@
 # Beelink Headless Ableton Rig — Master Roadmap
 
-**Status:** Design complete, implementation not started (0 lines of code)
-**Last updated:** 2026-08-07 (was 2026-08-03 — Phase 1 assumptions revised, see §0)
+**Status:** Phases 2, 4 and 5 built and green. Phase 1's exit test is met on hardware.
+Phase 3 is the real gap. ~2404 lines of rig code, 1364 lines of tests, 374 passing.
+**Last updated:** 2026-08-12 — reconciled against the actual tree, see §0
 **Purpose:** Single source of truth for build order. Work top to bottom. Do not skip phases.
 
 ---
@@ -9,27 +10,40 @@
 ## 0. Where the project actually stands
 
 ```text
-PROJECT STATE
+PROJECT STATE — reconciled against the tree 2026-08-12
 │
-├── COMPLETE
-│   ├── System blueprint (Start_DOCS, §1–56)   ← NOT IN THIS REPO, see below
-│   ├── Launchpad X hardware reference
-│   ├── Launchpad X Programmer's Reference Manual (obtained 2026-08-07)
-│   └── Bome MIDI Translator evaluation
+├── DONE, WITH CODE AND TESTS
+│   ├── Phase 2  rig/ storage/ config/rig.yaml main.py       exit test MET
+│   ├── Phase 4  set_browser/ scanner models metadata …      exit test MET
+│   └── Phase 5  ableton/ launcher process readiness …       exit test MET
 │
-├── PARTIALLY COMPLETE
-│   └── Nothing — documentation only
+├── DONE, ON HARDWARE
+│   ├── Phase 0  audio path proven, 256 @ 44.1k, 15 min clean (30 still owed)
+│   └── Phase 1  grid.py + colors.py hold MEASURED constants  exit test MET
+│
+├── PARTIALLY DONE
+│   ├── Phase 3  launchpad/ has grid colors animations mappings player
+│   │            MISSING: ports.py  device.py  renderer.py  modes.py
+│   │            — i.e. everything that actually opens the device
+│   ├── Phase 6  SSH lifeline works (Tailscale + key auth). The windows/ package
+│   │            does not exist: no hotspot.py ssh.py power.py commands.py
+│   └── Phase 7  power plan, Defender exclusions, startup trimming applied BY HAND.
+│                Nothing automated, no Task Scheduler entry, no cold-boot test
 │
 └── NOT STARTED
-    ├── Repository scaffolding beyond docs
-    ├── Every module
-    ├── Every hardware verification
-    └── Every Windows configuration step
+    ├── Phase 8  performance layer / the Bome decision
+    └── Phase 9  hardening, rehearsal, system image
 ```
 
-> ⚠️ **`Start_DOCS` is not in this repo.** Every `§n` reference below and in the other docs
-> points at that 4,073-line blueprint, which currently lives only in the claude.ai project
-> knowledge. Get it committed here before treating any § citation as checkable.
+> ### Why this section was wrong, and how to keep it right
+>
+> Until 2026-08-12 this file said "implementation not started (0 lines of code)"
+> while five phases of working code sat in the tree. It was taken at face value and
+> a session started rebuilding Phase 2 from scratch before anyone ran the tests.
+>
+> **The tree is the truth; this file is only a claim about the tree.** Before
+> trusting a status line here, run `pytest -q` and look at which modules exist.
+> Update this section in the same commit as the code, or it drifts again.
 
 The documentation is strong. The problem is that **large parts of it are built on assumptions
 that have never been tested against real hardware.** Phase 1 exists purely to convert
@@ -164,7 +178,10 @@ Python fixes it.
 ■ Launchpad X Programmer's Reference Guide downloaded to /docs   ← DONE 2026-08-07
 ```
 
-**Risk: Low.** Manual work only.
+**Risk: Low.**
+
+**STATUS: BUILT AND GREEN.** `set_browser/{scanner,models,metadata,pagination,service}.py`,
+covered by `tests/test_{scanner,metadata,pagination,set_browser_service}.py`. Manual work only.
 **Exit test: PARTIAL — 15 of 30 minutes, 2026-08-12.** Heavy NAM + IR chain, no
 crackles, CPU clock held at ~3.1 GHz with no throttling, EVO and Launchpad present
 throughout. Stopped early by choice; a re-test is owed with the real set anyway.
@@ -259,8 +276,13 @@ tests/                state machine + config validation
 ■ Unit tests pass                                                ← DONE 2026-08-09 (46 tests, incl. _bench SysEx vs manual p.14–15 examples)
 ```
 
-**Risk: Low.** Pure Python, fully testable with no hardware attached. This is the only phase that
-can be developed entirely off the Beelink.
+**STATUS: BUILT AND GREEN.** `rig/{state,controller,events,commands,exceptions}.py`,
+`storage/{config_loader,runtime_state}.py`, `config/rig.yaml`, `main.py`. Covered by
+`tests/test_{state,controller,events,commands,config_loader,runtime_state}.py`.
+Exit test met: illegal transitions rejected, config fails loudly with every problem at
+once, controller ticks without drifting, Ctrl+C exits clean.
+
+**Risk: Low.** Pure Python, fully testable with no hardware attached.
 
 > Built off-rig 2026-08-09 while awaiting the Beelink (Phases 0–1 hardware-blocked, not
 > skipped). The state transition table in `rig/state.py` is a DESIGN DECISION authored
@@ -292,6 +314,19 @@ launchpad/
 □ Folder-scanner animation runs without blocking the event loop
 □ Animation can be cancelled mid-run
 ```
+
+**STATUS: THE REAL GAP.** Present: `grid.py` and `colors.py` (measured constants, Phase 1),
+plus `animations.py`, `mappings.py`, `player.py` — all pure, all tested off-rig.
+
+**Absent: `ports.py`, `device.py`, `renderer.py`, `modes.py`** — everything that actually
+opens the device and drives it. Nothing in the repo has ever sent a byte to a Launchpad
+outside `tools/`, where the bench instruments proved the whole protocol works.
+
+The bench tools are the head start: `tools/_bench.py` already contains a working port
+classifier (Windows multi-port aware), the connect/restore lifecycle, the SysEx vocabulary
+and the rtmidi ignore-types fix. `device.py` is largely that code promoted from a throwaway
+instrument to a supported module — with the layering rule enforced: tools may not be
+imported, so it gets ported, not referenced.
 
 **Risk: Medium.** The reconnect + SysEx path is the single most common way this rig dies on
 stage. Test it 20 times, not twice.
@@ -360,6 +395,9 @@ ableton/
 
 ◪ = policy built+tested off-rig with fakes; the psutil adapter (`ableton/process.py`)
 is the ONLY unverified seam and gets one bench session on the Beelink.
+
+**STATUS: BUILT AND GREEN.** `ableton/{launcher,process,readiness,recovery,supervisor}.py`,
+covered by `tests/test_{ableton,supervisor}.py`.
 
 **Risk: High.** "Process exists" ≠ "set loaded". Until an Ableton Remote Script sends a READY
 signal, readiness is a timing guess. Accept that for now; log it as known debt.

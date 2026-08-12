@@ -16,16 +16,28 @@ rig:
 launchpad:
   brightness: 40         # UNVERIFIED sane-guess. Manual p.5: low brightness may be
                          # REQUIRED for the device to power on at all. Tune at bench.
-  port_contains: "LPX"   # UNVERIFIED — replace with verbatim substring from
-                         # tools/results/rig-survey-*.txt midi-ports section
+  port_contains: "2 (LPX MIDI)"
+  # MEASURED 2026-08-12. Windows reports four ports, ALL containing "LPX":
+  #   interface 1 (DAW) : 'LPX MIDI 0'            'LPX MIDI 1'
+  #   interface 2 (MIDI): 'MIDIIN2 (LPX MIDI) 1'  'MIDIOUT2 (LPX MIDI) 2'
+  # Programmer Mode lives on interface 2, so "LPX" alone is AMBIGUOUS -- it matches
+  # all four. "2 (LPX MIDI)" is carried by both interface-2 ports and neither
+  # interface-1 port.
+  # KNOWN LIMITATION: one substring cannot express "the second USB interface".
+  # Phase 3's ports.py should use the interface-number logic already proven in
+  # tools/_bench.py rather than this string. See docs/launchpad-x-sysex.md section 1b.
 
 audio_interface:
-  match_any:             # UNVERIFIED — replace from interface_name_inspector.py output
-    - "EVO 8"
+  match_any:
+    # MEASURED 2026-08-12. "EVO 8" NEVER MATCHED ANYTHING -- Windows reports the
+    # device as "Audient EVO8", closed up. The manual's names (p.14/p.36) do not
+    # exist on Windows at all. tools/results/interface-names-evo8.txt
+    - "Audient EVO8"
   require_status: "OK"   # presence only; an ESD-wedged EVO still reads OK (manual p.10)
 
 ableton:
-  exe: "C:\\ProgramData\\Ableton\\UNVERIFIED\\Program\\Ableton Live.exe"  # from rig_survey.py
+  # MEASURED 2026-08-12. Note ProgramData, not Program Files -- a guess would be wrong.
+  exe: "C:\\ProgramData\\Ableton\\Live 12 Suite\\Program\\Ableton Live 12 Suite.exe"
   sets_dir: "C:\\LiveRig\\Sets"                                           # roadmap §8 tree
 
 logging:

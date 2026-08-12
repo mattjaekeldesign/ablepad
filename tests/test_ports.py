@@ -1,0 +1,87 @@
+"""
+launchpad/ports.py — checked against the EXACT strings the rig reported.
+
+The values in test_windows_* are copied verbatim from
+tools/results/midi-ports-launchpad-attached.txt, measured 2026-08-12. They are the
+reason this module exists: a naive substring classifier passes every plausible-looking
+unit test and then fails on the only naming scheme that matters.
+"""
+
+from launchpad.ports import (
+    Classification,
+    Port,
+    PortError,
+    PortRole,
+    classify,
+    select,
+)
+
+# Verbatim from the rig, 2026-08-12.
+WIN_INPUTS = ["LPX MIDI 0", "MIDIIN2 (LPX MIDI) 1"]
+WIN_OUTPUTS = ["Microsoft GS Wavetable Synth 0", "LPX MIDI 1", "MIDIOUT2 (LPX MIDI) 2"]
+
+
+def test_windows_second_interface_is_the_midi_one():
+    ports = classify(WIN_INPUTS)
+    assert [(p.name, p.role, p.interface) for p in ports] == [
+        ("LPX MIDI 0", PortRole.DAW, 1),
+        ("MIDIIN2 (LPX MIDI) 1", PortRole.MIDI, 2),
+    ]
+    assert select(ports, PortRole.MIDI).name == "MIDIIN2 (LPX MIDI) 1"
+
+
+def test_windows_outputs_ignore_the_gs_synth():
+    ports = classify(WIN_OUTPUTS)
+    assert len(ports) == 2
+    assert select(ports, PortRole.MIDI).name == "MIDIOUT2 (LPX MIDI) 2"
+    assert select(ports, PortRole.DAW).name == "LPX MIDI 1"
+
+
+def test_windows_names_are_classified_by_interface_not_by_name():
+    # Every Windows name contains "MIDI" and none contains "DAW". If this ever
+    # reports BY_NAME, the classifier has regressed to substring matching.
+    assert all(p.how is Classification.BY_INTERFACE for p in classify(WIN_INPUTS))
+
+
+def test_explicit_names_still_win_on_macos_and_linux():
+    ports = classify(["Launchpad X LPX DAW Out", "Launchpad X LPX MIDI Out"])
+    assert [(p.role, p.how) for p in ports] == [
+        (PortRole.DAW, Classification.BY_NAME),
+        (PortRole.MIDI, Classification.BY_NAME),
+    ]
+
+
+def test_uninformative_names_fall_back_to_position_and_say_so():
+    ports = classify(["Launchpad X 0", "Launchpad X 1"])
+    assert [(p.role, p.how) for p in ports] == [
+        (PortRole.DAW, Classification.BY_ORDINAL),
+        (PortRole.MIDI, Classification.BY_ORDINAL),
+    ]
+
+
+def test_non_launchpad_devices_are_dropped():
+    assert classify(["Microsoft GS Wavetable Synth 0", "Audient EVO8", "Realtek"]) == []
+
+
+def test_missing_port_raises_with_something_actionable():
+    try:
+        select(classify([]), PortRole.MIDI)
+    except PortError as exc:
+        assert "plugged in" in str(exc)
+    else:
+        raise AssertionError("expected PortError")
+
+
+def test_two_launchpads_refuses_to_guess():
+    # A second unit, or a virtual port impersonating one. Picking the first would
+    # silently drive the wrong device.
+    ports = [
+        Port("MIDIIN2 (LPX MIDI) 1", PortRole.MIDI, Classification.BY_INTERFACE, 2),
+        Port("MIDIIN2 (LPX MIDI) 3", PortRole.MIDI, Classification.BY_INTERFACE, 2),
+    ]
+    try:
+        select(ports, PortRole.MIDI)
+    except PortError as exc:
+        assert "Refusing to guess" in str(exc)
+    else:
+        raise AssertionError("expected PortError")

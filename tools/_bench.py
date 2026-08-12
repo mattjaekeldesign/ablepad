@@ -237,7 +237,11 @@ def find_ports(names: Sequence[str]) -> list[Port]:
             ports.append(Port(name, PortRole.MIDI, ordinal, "name", _interface_number(name)))
             continue
 
-        ports.append(Port(name, PortRole.UNKNOWN, ordinal, "name", None))
+        # Names that say nothing at all ("Launchpad X 0", "Launchpad X 1"). Fall back
+        # to the manual's ordinal rule (p.6): first interface DAW, second MIDI. Flagged
+        # as "ordinal" so callers can warn that this is the weakest classification.
+        fallback = {0: PortRole.DAW, 1: PortRole.MIDI}.get(ordinal, PortRole.UNKNOWN)
+        ports.append(Port(name, fallback, ordinal, "ordinal", ordinal + 1))
     return ports
 
 
@@ -310,6 +314,17 @@ _NOVATION = (0x00, 0x20, 0x29)  # data[4:7]
 _STATE_APPLICATION = 0x01
 _STATE_BOOTLOADER = 0x11
 
+# data[7] identifies the device family. TWO values are legitimate for a Launchpad X:
+#   0x13  what the Programmer's Reference prints (p.6)
+#   0x03  what the hardware ACTUALLY sends -- measured 2026-08-12, firmware 0.3.5.1
+#
+# This must stay a WHITELIST. Dropping the check entirely (which an earlier fix did,
+# to make the real reply parse) means a Launchpad Mini MK3 also parses as a
+# Launchpad X. Those are different devices with different SysEx IDs, and quietly
+# accepting one as the other is exactly the confusion this project has been bitten
+# by before -- see docs/launchpad-x-sysex.md §3 on 0x0C vs 0x0D.
+_KNOWN_FAMILY_BYTES = frozenset({0x03, 0x13})
+
 
 def parse_device_inquiry(data: Sequence[int]) -> DeviceIdentity | None:
     """
@@ -323,11 +338,10 @@ def parse_device_inquiry(data: Sequence[int]) -> DeviceIdentity | None:
     byte shorter than the manual's layout implies. The state byte that follows it
     is 0x01 = application, which does match.
 
-    So byte 7 is NOT validated here -- the first version of this function required
-    0x13 and silently returned None against real hardware, which is how the boot-time
-    presence check "worked" in tests and failed on the bench. What is validated is
-    the part the MIDI spec guarantees: the 7E .. 06 02 sub-ID and the Novation
-    manufacturer ID. Everything after is reported, not asserted.
+    So byte 7 is validated against a WHITELIST of {0x03, 0x13} rather than the single
+    documented value. Requiring 0x13 alone rejected the real device; accepting anything
+    would make a Mini MK3 parse as a Launchpad X. Both failure modes are silent, and
+    the whitelist avoids both.
     """
     if len(data) < 9:
         return None
@@ -335,10 +349,13 @@ def parse_device_inquiry(data: Sequence[int]) -> DeviceIdentity | None:
         return None
     if tuple(data[2:4]) != _INQUIRY_SUBID or tuple(data[4:7]) != _NOVATION:
         return None
+    if data[7] not in _KNOWN_FAMILY_BYTES:
+        return None
     state = data[8]
     if state not in (_STATE_APPLICATION, _STATE_BOOTLOADER):
         return None
-    version = ".".join(str(b) for b in data[11:]) or "unknown"
+    # p.6: four bytes, one decimal digit each. Concatenated, not dotted.
+    version = "".join(str(b) for b in data[11:15]) or "unknown"
     return DeviceIdentity(state == _STATE_APPLICATION, version, tuple(data))
 
 

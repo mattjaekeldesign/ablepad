@@ -36,29 +36,50 @@ The last one is the one that matters on stage. See §6.
 
 ## 2. Identity on Windows
 
-**The manual prints a real device name**, which replaces a guess in `config/rig.yaml`:
+**The manual's device names are wrong on Windows.** p.14 shows "EVO 8 Main Output 1+2"
+and p.36 shows "Loop-back 1+2". Neither string exists. MEASURED 2026-08-12 with the
+interface attached, `Get-PnpDevice` reports 13 endpoints plus the device node:
 
-> "In the list of devices, find **EVO 8 Main Output 1+2**, click on it and select Set Default
-> Device." — p.14
+```text
+DEVICE NODE   'Audient EVO8'                             Class MEDIA
+              InstanceId  TUSBAUDIO_ENUM\VID_2708&PID_0007&KS\...
 
-Loop-back appears separately:
+OUTPUTS       'Main Output 1/2 (Audient EVO8)'
+              'Line 3/4 (Audient EVO8)'
+INPUTS        'Mic | Line | Instrument 1 (Audient EVO8)'
+              'Mic | Line 2 (Audient EVO8)'   'Mic | Line 3 (Audient EVO8)'
+              'Mic | Line 4 (Audient EVO8)'
+              'Mic | Line 1/2 (Audient EVO8)' 'Mic | Line 3/4 (Audient EVO8)'
+LOOP-BACK     'Loop-back 1 (Audient EVO8)'    'Loop-back 2 (Audient EVO8)'
+              'Loop-back 1/2 (Audient EVO8)'  x2  <- SAME NAME, TWO ENDPOINTS
+```
 
-> "In the list of output devices, find **Loop-back 1+2**" — p.36
+Three things differ from the manual, and all three matter:
+
+1. **`EVO8`, closed up — not `EVO 8`.** A match on `'EVO 8'` never fires. This document
+   previously recommended exactly that, and `interface_name_inspector.py` emitted it as a
+   `rig.yaml` candidate. Both were wrong, and the tool found its own bug the first time it
+   met the hardware.
+2. **Slash, not plus** — `Main Output 1/2`, not `Main Output 1+2`.
+3. **The device name is a parenthetical suffix**, so every endpoint ends in `(Audient EVO8)`.
+
+**Gate presence on the hardware ID, not on a name:**
 
 ```yaml
-# config/rig.yaml — candidate, from the manual's own screenshots. Still confirm with
-# tools/interface_name_inspector.py on the Beelink: this is what Windows *displays*,
-# and Get-PnpDevice FriendlyName is not guaranteed to be the identical string.
+# config/rig.yaml -- MEASURED 2026-08-12, tools/results/interface-names-evo8.txt
 audio_interface:
+  hardware_id: 'VID_2708&PID_0007'     # Audient EVO 8. Does not move.
   match_any:
-    - 'EVO 8'
+    - 'Audient EVO8'                    # the Class MEDIA device node
   require_status: OK
 ```
 
-> ⚠️ **A printed name is not a `Get-PnpDevice` name.** The manual is showing the Sound control
-> panel. `FriendlyName` may differ, and there will be several matching endpoints (Main Output
-> 1+2, Loop-back 1+2, the four inputs). Match on the substring `EVO 8`, record every endpoint
-> the inspector reports, and decide deliberately which one proves "the interface is present".
+> ⚠️ **Two endpoints share the friendly name `Loop-back 1/2 (Audient EVO8)`.** Matching on
+> friendly names is therefore ambiguous *on this device today*, never mind across driver
+> versions or locales. `VID_2708&PID_0007` is the only identifier that cannot drift.
+>
+> And Loop-back is the wrong thing to gate on regardless — it is virtual routing, present
+> whether or not audio can reach a mixer.
 
 **Windows driver is mandatory** (p.13): download from the EVO 8 downloads page, run the `.exe`,
 reboot into it before the Launchpad work matters. macOS works with no driver at all (p.11) —

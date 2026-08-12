@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 
@@ -163,16 +164,46 @@ def main() -> int:
         rec.add("#   name and the PnP FriendlyName are different fields. Use what is above.")
     rec.add()
 
+    # The hardware ID is the honest identifier. Friendly names are marketing text:
+    # they change with driver versions, they get localised, and here two endpoints
+    # share one. VID/PID does not move. Derive it rather than trusting the manual --
+    # this tool previously emitted 'EVO 8', hardcoded from the manual, which never
+    # matches anything because Windows reports 'Audient EVO8' with no space.
+    hardware_ids = sorted({
+        m.group(0)
+        for d in relevant
+        for m in [re.search(r"VID_[0-9A-F]{4}&PID_[0-9A-F]{4}", d.get("InstanceId") or "", re.I)]
+        if m
+    })
+    device_nodes = [d for d in relevant if (d.get("Class") or "").upper() == "MEDIA"]
+
     rec.add("# --- PASTE INTO config/rig.yaml ---")
     rec.add()
     rec.add("audio_interface:")
-    rec.add("  # Substring match, not whole-string: friendly names can carry a trailing")
-    rec.add("  # instance number that changes across re-enumeration. Verify by replugging")
-    rec.add("  # and re-running this tool.")
+    if hardware_ids:
+        rec.add("  # Gate on the HARDWARE ID, not a friendly name. Friendly names are")
+        rec.add("  # marketing text -- they change with driver versions and get localised.")
+        rec.add("  hardware_id: " + repr(hardware_ids[0]))
+    for node in device_nodes:
+        rec.add(f"  # device node: {node.get('FriendlyName')!r} (Class MEDIA) -- the")
+        rec.add("  # interface itself, as opposed to the endpoints it exposes.")
     rec.add("  match_any:")
-    rec.add("    - 'EVO 8'")
+    for name in sorted({(d.get("FriendlyName") or "") for d in device_nodes}) or ["Audient"]:
+        rec.add(f"    - {name!r}")
     rec.add("  require_status: OK")
     rec.add()
+
+    dupes = [
+        n for n in {(d.get("FriendlyName") or "") for d in relevant}
+        if sum(1 for d in relevant if d.get("FriendlyName") == n) > 1
+    ]
+    if dupes:
+        rec.add(f"# WARNING: {len(dupes)} friendly name(s) are used by MORE THAN ONE endpoint:")
+        for n in sorted(dupes):
+            rec.add(f"#     {n!r}")
+        rec.add("# Matching on those names alone is ambiguous. Another reason to use the")
+        rec.add("# hardware ID for presence and to name endpoints only for logging.")
+        rec.add()
     rec.add("# Endpoints observed this run, for the record:")
     for device in relevant:
         rec.add(f"#     {device.get('FriendlyName')!r}  [{device.get('Status')}]")

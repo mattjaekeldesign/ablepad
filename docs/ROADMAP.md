@@ -132,9 +132,10 @@ Python fixes it.
 ■ Audient EVO 8 Windows driver installed — CONFIRMED 2026-08-12
 │   └── driver packages oem98.inf/oem99.inf v5.4.0.20404, ASIO registered,
 │       tray app running
-□ EVO 8 HARDWARE NOT ENUMERATING as of 2026-08-12 — nothing with Audient's
-│   VID_2708 is on the USB bus at all. Driver is fine; the device is not
-│   presenting. Blocks every remaining Phase 0 audio checkbox
+■ EVO 8 enumerating — CONFIRMED 2026-08-12 after a replug
+│   └── device node 'Audient EVO8' (MEDIA), VID_2708&PID_0007, 13 audio endpoints
+│   └── gate presence on the HARDWARE ID: friendly names differ from the manual
+│       and two endpoints share one. tools/results/interface-names-evo8.txt
 □ EVO firmware updated WHILE STILL ONLINE; driver + firmware versions recorded
 □ EVO Mixer tray app running; ASIO buffer + sample rate set THERE, not in Ableton
 □ Beelink USB port chosen and recorded (USB-A = 2 phantom channels, USB-C @1.5A = 4)
@@ -198,9 +199,11 @@ tools/
 ■ Release semantics confirmed (note-on vel 0)                   ← DONE, manual p.6
 ■ Batch LED write                                               ← DONE, 81 entries/msg, p.15
 □ Port list recorded — exact Windows name strings for both interfaces
-□ EVO 8 Get-PnpDevice friendly names recorded for EVERY endpoint
-│   └── manual prints 'EVO 8 Main Output 1+2' and 'Loop-back 1+2' — confirm against PnP
-□ Decided which endpoint means 'interface present' (Loop-back is not it)
+■ EVO 8 endpoint names recorded — DONE 2026-08-12, all 13 + the device node
+│   └── manual's 'EVO 8 Main Output 1+2' and 'Loop-back 1+2' DO NOT EXIST
+│   └── real: 'Main Output 1/2 (Audient EVO8)' — slash not plus, EVO8 not EVO 8
+■ Presence signal decided: hardware id VID_2708&PID_0007, not a friendly name
+│   └── two endpoints share the name 'Loop-back 1/2 (Audient EVO8)'
 □ Programmer→Live restore-on-crash proven (kill the process, check the Setup menu still opens)
 ```
 

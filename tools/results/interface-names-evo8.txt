@@ -1,0 +1,156 @@
+# Recorded by tools/interface_name_inspector.py
+# Date:     2026-08-11
+# Machine:  Windows 11
+# Backend:  mido.backends.rtmidi
+# Source:   physical measurement against the hardware
+#
+# Paste into the target module WITH this header. It is the provenance.
+
+# Label: evo8
+# Query: Get-PnpDevice -PresentOnly | Where-Object { $_.Class -in @('MEDIA','AudioEndpoint','USB','SoundVideoAndGameControllers') } | Select-Object FriendlyName, Class, Status, InstanceId | ConvertTo-Json -Depth 3
+
+# --- 28 AUDIO-CLASS DEVICES PRESENT ---
+#   [OK] AudioEndpoint                'Microphone (2- Realtek High Definition Audio)'
+#   [OK] AudioEndpoint                'Mic | Line 4 (Audient EVO8)' <<<
+#   [OK] AudioEndpoint                'Loop-back 2 (Audient EVO8)' <<<
+#   [OK] AudioEndpoint                'Mic | Line 3 (Audient EVO8)' <<<
+#   [OK] AudioEndpoint                'Loop-back 1 (Audient EVO8)' <<<
+#   [OK] USB                          'USB Root Hub (USB 3.0)'
+#   [OK] MEDIA                        'Audient EVO8' <<<
+#   [OK] USB                          'Intel(R) USB 3.20 eXtensible Host Controller - 1.20 (Microsoft)'
+#   [OK] AudioEndpoint                'Loop-back 1/2 (Audient EVO8)' <<<
+#   [OK] AudioEndpoint                'Mic | Line 2 (Audient EVO8)' <<<
+#   [OK] AudioEndpoint                'Mic | Line | Instrument 1 (Audient EVO8)' <<<
+#   [OK] AudioEndpoint                'ES-G34C5 (HD Audio Driver for Display Audio)'
+#   [OK] USB                          'USB Composite Device'
+#   [OK] MEDIA                        'HD Audio Driver for Display Audio'
+#   [OK] AudioEndpoint                'Mic | Line 3/4 (Audient EVO8)' <<<
+#   [OK] USB                          'Generic USB Hub'
+#   [OK] USB                          'USB Root Hub (USB 3.0)'
+#   [OK] AudioEndpoint                'Line 3/4 (Audient EVO8)' <<<
+#   [OK] AudioEndpoint                'Mic | Line 1/2 (Audient EVO8)' <<<
+#   [OK] MEDIA                        'HD Audio Driver for Display Audio'
+#   [OK] MEDIA                        'LPX MIDI'
+#   [OK] MEDIA                        'Realtek High Definition Audio'
+#   [OK] AudioEndpoint                'Speakers (2- Realtek High Definition Audio)'
+#   [OK] USB                          'Intel(R) USB 3.10 eXtensible Host Controller - 1.20 (Microsoft)'
+#   [OK] AudioEndpoint                'Loop-back 1/2 (Audient EVO8)' <<<
+#   [OK] USB                          'USB Composite Device'
+#   [OK] AudioEndpoint                'Main Output 1/2 (Audient EVO8)' <<<
+#   [OK] USB                          'USB Composite Device'
+
+# --- 13 MATCHING ENDPOINT(S), FULL DETAIL ---
+#   FriendlyName : 'Mic | Line 4 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.1.00000000}.{ED32B741-6CF3-4DA0-A585-D2B61494EC34}'
+#
+#   FriendlyName : 'Loop-back 2 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.1.00000000}.{7476F2B6-BDC9-4E6E-9F09-15FE2F0F4CD6}'
+#
+#   FriendlyName : 'Mic | Line 3 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.1.00000000}.{2BEFAE93-1900-4139-B312-9E149A04A09F}'
+#
+#   FriendlyName : 'Loop-back 1 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.1.00000000}.{AF8CA883-3764-48D7-BC75-F293E416B7E5}'
+#
+#   FriendlyName : 'Audient EVO8'
+#   Class        : 'MEDIA'
+#   Status       : 'OK'
+#   InstanceId   : 'TUSBAUDIO_ENUM\\VID_2708&PID_0007&KS\\6&624169D&1&4'
+#
+#   FriendlyName : 'Loop-back 1/2 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.0.00000000}.{3256F4B3-D371-472C-8C68-4122A14E49A6}'
+#
+#   FriendlyName : 'Mic | Line 2 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.1.00000000}.{FDD5DB08-9908-4AFC-A49B-C53CC9625394}'
+#
+#   FriendlyName : 'Mic | Line | Instrument 1 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.1.00000000}.{9D5466EB-7B95-4109-B2AC-257D4B686DE7}'
+#
+#   FriendlyName : 'Mic | Line 3/4 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.1.00000000}.{C56D1D18-2852-4731-BF7D-8B6ABBA270AF}'
+#
+#   FriendlyName : 'Line 3/4 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.0.00000000}.{7414D7C3-B8D8-40CD-BF5B-866ADECF3CB1}'
+#
+#   FriendlyName : 'Mic | Line 1/2 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.1.00000000}.{080776A6-0D76-43E3-886C-69A24CDA191D}'
+#
+#   FriendlyName : 'Loop-back 1/2 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.1.00000000}.{950AB4BE-AE18-469C-9AE9-F8D135548D52}'
+#
+#   FriendlyName : 'Main Output 1/2 (Audient EVO8)'
+#   Class        : 'AudioEndpoint'
+#   Status       : 'OK'
+#   InstanceId   : 'SWD\\MMDEVAPI\\{0.0.0.00000000}.{BA9C2EC0-9CA7-4F2B-8085-E135FA544FE9}'
+#
+
+# --- DOES Get-PnpDevice AGREE WITH THE MANUAL? ---
+#   NOT FOUND 'EVO 8 Main Output 1+2'  (manual p.14 — the main playback endpoint)
+#   NOT FOUND 'Loop-back 1+2'  (manual p.36 — virtual routing, NOT a presence signal)
+#   Neither manual name appears. That is a real finding: the control-panel
+#   name and the PnP FriendlyName are different fields. Use what is above.
+
+# --- PASTE INTO config/rig.yaml ---
+
+audio_interface:
+  # Gate on the HARDWARE ID, not a friendly name. Friendly names are
+  # marketing text -- they change with driver versions and get localised.
+  hardware_id: 'VID_2708&PID_0007'
+  # device node: 'Audient EVO8' (Class MEDIA) -- the
+  # interface itself, as opposed to the endpoints it exposes.
+  match_any:
+    - 'Audient EVO8'
+  require_status: OK
+
+# WARNING: 1 friendly name(s) are used by MORE THAN ONE endpoint:
+#     'Loop-back 1/2 (Audient EVO8)'
+# Matching on those names alone is ambiguous. Another reason to use the
+# hardware ID for presence and to name endpoints only for logging.
+
+# Endpoints observed this run, for the record:
+#     'Mic | Line 4 (Audient EVO8)'  [OK]
+#     'Loop-back 2 (Audient EVO8)'  [OK]
+#     'Mic | Line 3 (Audient EVO8)'  [OK]
+#     'Loop-back 1 (Audient EVO8)'  [OK]
+#     'Audient EVO8'  [OK]
+#     'Loop-back 1/2 (Audient EVO8)'  [OK]
+#     'Mic | Line 2 (Audient EVO8)'  [OK]
+#     'Mic | Line | Instrument 1 (Audient EVO8)'  [OK]
+#     'Mic | Line 3/4 (Audient EVO8)'  [OK]
+#     'Line 3/4 (Audient EVO8)'  [OK]
+#     'Mic | Line 1/2 (Audient EVO8)'  [OK]
+#     'Loop-back 1/2 (Audient EVO8)'  [OK]
+#     'Main Output 1/2 (Audient EVO8)'  [OK]
+
+# CHOOSE THE PRESENCE ENDPOINT DELIBERATELY. The EVO 8 exposes several, and
+# Loop-back is a virtual routing channel -- its presence says nothing about
+# whether audio can reach a mixer. Gate on the main output, not on whatever
+# happens to sort first.
+#
+# AND: Status == OK is still only PRESENCE. An ESD event can leave the EVO 8
+# enumerated but silent, recoverable only by a physical replug (manual p.10).
+# Phase 5's guard prevents launching into a MISSING interface; it cannot
+# detect a wedged one. That needs a separate health check -- see
+# docs/audient-evo-8-reference.md section 6.

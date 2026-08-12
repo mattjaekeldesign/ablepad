@@ -1,0 +1,31 @@
+# Recorded 2026-08-12, Beelink RIG
+# Source: operator report from the machine, plus process/registry survey over SSH
+
+audio:
+  sample_rate_hz: 44100
+  buffer_samples: 512
+  asio_driver: 'Audient USB Audio ASIO Driver'
+  asio_clsid:  '{E7E92954-EA17-433A-9142-EE419BE4875C}'
+  status: 'no dropouts observed'
+  signal_chain: 'guitar -> EVO 8 front DI -> Ableton Live 12.4.3 -> NAM + IR -> outputs'
+
+# --- who owns the buffer ---
+# The ASIO driver does, not Ableton. Ableton's Buffer Size control is read-only
+# whenever an ASIO device is selected; it defers to the driver's own panel.
+# Reachable from Ableton via Preferences > Audio > Hardware Setup, or from the
+# EVO tray app (manual p.26). Both were running during this session:
+#     EVO                  pid 2480   (the tray app / mixer)
+#     AbletonAudioCpl      pid 11764  (Ableton's audio control process)
+#
+# HEADLESS CONSEQUENCE: buffer and sample rate can only be changed through a GUI.
+# On a screenless rig that means SSH + a remote desktop, or a pre-baked setting
+# frozen into the system image. Open item 6 in docs/audient-evo-8-reference.md.
+
+# --- derived latency, NOT measured ---
+# One buffer at 512/44100 = 11.61 ms.
+# The manual measures DAW round trip at a 32-sample buffer as 5 ms @ 44.1 kHz
+# (p.39), which implies ~3.5 ms of fixed overhead once the buffer term is removed.
+# Extrapolating: 2 x 11.61 + 3.5 ~= 27 ms round trip.
+#
+# TREAT THAT AS AN ESTIMATE. Ableton reports the real figure as "Overall Latency"
+# in Preferences > Audio. That number is authoritative and should replace this one.

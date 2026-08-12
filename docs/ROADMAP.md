@@ -137,12 +137,18 @@ Python fixes it.
 │   └── gate presence on the HARDWARE ID: friendly names differ from the manual
 │       and two endpoints share one. tools/results/interface-names-evo8.txt
 □ EVO firmware updated WHILE STILL ONLINE; driver + firmware versions recorded
-□ EVO Mixer tray app running; ASIO buffer + sample rate set THERE, not in Ableton
+■ EVO Mixer tray app running (pid 2480) — CONFIRMED 2026-08-12
 □ Beelink USB port chosen and recorded (USB-A = 2 phantom channels, USB-C @1.5A = 4)
-□ ASIO confirmed in Ableton
-□ Guitar → EVO 8 front DI → Ableton → mixer produces sound (DI overrides channel 1)
-□ Buffer size and sample rate chosen and written down
-□ Round-trip latency measured and judged playable
+■ ASIO confirmed in Ableton — DONE 2026-08-12, 'Audient USB Audio ASIO Driver'
+■ Guitar → EVO 8 front DI → Ableton → NAM + IR produces sound — DONE 2026-08-12
+■ Buffer size and sample rate written down — DONE 2026-08-12
+│   └── 512 samples @ 44100 Hz. Set in the ASIO driver panel, NOT in Ableton —
+│       Ableton's control is read-only for ASIO devices. See
+│       tools/results/phase0-audio-settings.txt
+□ Round-trip latency: judged playable by ear at 512/44.1k, no dropouts.
+│   └── NOT yet read from Ableton's "Overall Latency" field — do that and record it.
+│       Derived estimate is ~27 ms, which is high for a guitar processor; worth
+│       trying 256 or 128 before accepting it
 □ C:\LiveRig\ folder tree created (§8)
 □ Python 3.12+ installed — NOT PRESENT 2026-08-12 (WindowsApps python.exe is a
 │   0-byte Store alias stub, and `py` is absent — there is no Python on the box)

@@ -29,3 +29,63 @@ audio:
 #
 # TREAT THAT AS AN ESTIMATE. Ableton reports the real figure as "Overall Latency"
 # in Preferences > Audio. That number is authoritative and should replace this one.
+
+# ============================================================================
+# UPDATE 2026-08-12 — buffer lowered to 256, and the power plan fixed
+# ============================================================================
+
+audio:
+  sample_rate_hz: 44100
+  buffer_samples: 256          # was 512
+  status: 'no crackles, judged to sound great by the operator'
+
+# --- CPU, sampled over SSH ---
+#   at 512, Balanced plan        : Ableton avg 12.3%  peak 15.2%  of 4 cores
+#   at 256, High performance plan: Ableton avg  9.2%  peak 11.9%  of 4 cores
+#
+# Audio runs on ONE thread, so read those as ~49% and ~37% of a single core.
+# Lower load at HALF the buffer is the interesting part: the work per second did
+# not change, but the CPU is no longer downclocking between buffers.
+#
+# Caveat: the two samples differ in BOTH buffer size and power plan, so this is
+# not a controlled comparison. Directionally good, not a measurement of either
+# change in isolation.
+
+# --- power plan, BEFORE ---
+#   scheme              : Balanced (381b4222-...)
+#   min processor state : 5%     <- cores downclock/park between audio buffers.
+#                                   The classic dropout cause on Intel N-series:
+#                                   average CPU looks fine, the 5.8 ms deadline
+#                                   at 256 samples still gets missed on ramp-up.
+
+# --- power plan, AFTER ---
+scheme: 'High performance (6bdc3f41-4e92-4e22-830c-30f084a6616d)'
+processor:
+  min_state_ac: 100
+  max_state_ac: 100
+sleep:
+  standby_ac: 0
+  hibernate_ac: 0
+  video_ac: 0
+  disk_ac: 0
+usb:
+  selective_suspend_ac: 0      # would drop the Launchpad and EVO off the bus
+#
+# NOTE: a scheme change does NOT carry settings over. The no-sleep values set on
+# 2026-08-11 were applied to Balanced and had to be re-applied here. Anyone
+# switching schemes again must re-apply all of the above.
+
+# --- CPU frequency ---
+#   Intel N150, 4 cores. WMI MaxClockSpeed reports 800 MHz -- that is the NOMINAL
+#   base clock, and Win32_Processor.CurrentClockSpeed just echoes it back. Useless.
+#   The real figure comes from '\Processor Information(_Total)\% Processor Performance':
+#       392% of nominal  =>  ~3.14 GHz sustained
+#   NOT a before/after comparison: only CurrentClockSpeed was read before the change,
+#   and that number was meaningless. No baseline exists for the boost behaviour.
+
+# --- still eating CPU on a machine meant to be an appliance ---
+#   MsMpEng             462 CPU-s   Defender real-time scanning (no exclusions set)
+#   PresentMonService   364 CPU-s   graphics telemetry, nothing here needs it
+#   IntelGraphicsSoftware 149 CPU-s startup item
+#   msedge               49 CPU-s   browser open during the test
+#   Phase 7 work. None of it touched yet.

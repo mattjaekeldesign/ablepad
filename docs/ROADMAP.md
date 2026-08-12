@@ -142,13 +142,15 @@ Python fixes it.
 ■ ASIO confirmed in Ableton — DONE 2026-08-12, 'Audient USB Audio ASIO Driver'
 ■ Guitar → EVO 8 front DI → Ableton → NAM + IR produces sound — DONE 2026-08-12
 ■ Buffer size and sample rate written down — DONE 2026-08-12
-│   └── 512 samples @ 44100 Hz. Set in the ASIO driver panel, NOT in Ableton —
-│       Ableton's control is read-only for ASIO devices. See
-│       tools/results/phase0-audio-settings.txt
-□ Round-trip latency: judged playable by ear at 512/44.1k, no dropouts.
-│   └── NOT yet read from Ableton's "Overall Latency" field — do that and record it.
-│       Derived estimate is ~27 ms, which is high for a guitar processor; worth
-│       trying 256 or 128 before accepting it
+│   └── **256 samples @ 44100 Hz**, no crackles. Set in the ASIO driver panel,
+│       NOT in Ableton — Ableton's control is read-only for ASIO devices
+│   └── GUI-ONLY: nothing persists these where a script can reach them, so they
+│       must be frozen into the system image. EVO reference open item 6
+│   └── tools/results/phase0-audio-settings.txt
+□ Round-trip latency: 256 @ 44.1k holds cleanly, judged to sound great.
+│   └── derived estimate ~15 ms (was ~27 ms at 512)
+│   └── STILL OWED: read Ableton's "Overall Latency" field and record the real
+│       number. The estimate is arithmetic from the manual, not a measurement
 □ C:\LiveRig\ folder tree created (§8)
 □ Python 3.12+ installed — NOT PRESENT 2026-08-12 (WindowsApps python.exe is a
 │   0-byte Store alias stub, and `py` is absent — there is no Python on the box)
@@ -389,7 +391,12 @@ Beelink's adapter supports it before committing to the design.
 
 ```text
 □ Task Scheduler starts the controller at logon, restarts on failure
-□ Power plan: no sleep, no hibernate, no USB selective suspend
+■ Power plan — DONE 2026-08-12. High performance scheme, min AND max processor
+│   state 100%, no sleep/hibernate/display/disk timeout, USB selective suspend off
+│   └── was Balanced with min processor state 5% — cores downclocking between
+│       audio buffers, the classic dropout cause on Intel N-series
+│   └── scheme changes do NOT carry settings over; re-apply if the scheme changes
+□ Defender exclusions, and disable PresentMonService / IntelGraphicsSoftware startup
 □ Notifications, update reboots, startup apps disabled
 □ Cold boot with monitor attached → rig reaches Set Browser unaided
 □ Cold boot with NO monitor/keyboard/mouse → same result

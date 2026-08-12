@@ -129,9 +129,12 @@ Python fixes it.
 
 ```text
 □ Windows account "LiveRig" created, auto-login enabled
-■ Audient EVO 8 Windows driver installed — CONFIRMED 2026-08-12: PnP knows 'EVO8'
-│   (MEDIA class) and 'Audient DFU', both currently Status=Unknown, i.e. driver present
-│   and the device has been attached before but is NOT plugged in right now
+■ Audient EVO 8 Windows driver installed — CONFIRMED 2026-08-12
+│   └── driver packages oem98.inf/oem99.inf v5.4.0.20404, ASIO registered,
+│       tray app running
+□ EVO 8 HARDWARE NOT ENUMERATING as of 2026-08-12 — nothing with Audient's
+│   VID_2708 is on the USB bus at all. Driver is fine; the device is not
+│   presenting. Blocks every remaining Phase 0 audio checkbox
 □ EVO firmware updated WHILE STILL ONLINE; driver + firmware versions recorded
 □ EVO Mixer tray app running; ASIO buffer + sample rate set THERE, not in Ableton
 □ Beelink USB port chosen and recorded (USB-A = 2 phantom channels, USB-C @1.5A = 4)
@@ -145,7 +148,10 @@ Python fixes it.
 ■ Git installed — CONFIRMED 2026-08-12, C:\Program Files\Git\cmd\git.exe
 □ VSCode installed — not present 2026-08-12
 □ Repo initialised, .gitignore, venv, requirements.txt
-□ Ableton executable path recorded verbatim
+■ Ableton executable path recorded — DONE 2026-08-12
+│   └── C:\ProgramData\Ableton\Live 12 Suite\Program\Ableton Live 12 Suite.exe
+│   └── Live 12 Suite 12.4.3. Note ProgramData, NOT Program Files — a guess would
+│       have been wrong. tools/results/phase0-ableton-evo.txt
 ■ Launchpad X Programmer's Reference Guide downloaded to /docs   ← DONE 2026-08-07
 ```
 

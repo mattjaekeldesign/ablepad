@@ -1,0 +1,38 @@
+# Recorded by a Phase 0 survey over SSH
+# Date:     2026-08-12
+# Machine:  Beelink RIG, Windows 11 Home
+# Source:   physical measurement against the hardware
+
+# --- ABLETON: FOUND ---
+ableton:
+  exe: 'C:\ProgramData\Ableton\Live 12 Suite\Program\Ableton Live 12 Suite.exe'
+  product_version: '12.4.3'
+  edition: 'Live 12 Suite'
+# Note the location: ProgramData, NOT Program Files. Anything that guessed
+# "C:\Program Files\Ableton\..." would have been wrong.
+
+# --- AUDIENT SOFTWARE: FULLY INSTALLED ---
+#   driver packages : oem98.inf, oem99.inf   Audient 5.4.0.20404
+#   ASIO registered : HKLM\SOFTWARE\ASIO\Audient USB Audio ASIO Driver
+#   files           : C:\Program Files\Audient\{EVO,USBAudioDriver,driverSetup}
+#   tray app        : AudientAppLauncher running (pid 12040)
+
+# --- EVO 8 HARDWARE: NOT ENUMERATING ---
+# Every present USB device, by VID:PID —
+#     1235:0109  Launchpad X (Novation)
+#     05E3:0608  Generic USB Hub
+#     1A86:8095  Generic USB Hub
+#     047D:8018  HID consumer control
+#     0665:6000  USB input device
+#     8087:0026  Intel Bluetooth
+#
+# Audient's VID is 2708. NOTHING with VID_2708 is present, and nothing with
+# VID_2708 exists in the PnP database even as a removed device.
+#
+# This is not a driver fault and not a "presence vs health" case: the interface
+# is not presenting itself on the USB bus at all. No device node, no error code,
+# no unknown device.
+#
+# It HAS been attached to this machine before: a survey on 2026-08-11 saw
+# 'EVO8' (MEDIA) and 'Audient DFU' as Status=Unknown ghosts. Those nodes are now
+# gone, which is consistent with the driver reinstall clearing them.

@@ -12,8 +12,12 @@ LAYER: Drivers + Services for the one piece of hardware that is the whole UI.
     animations.py    deterministic frame engine, golden-verified against the Lab.
     player.py        intro/during playback policy.
 
-STILL ABSENT: renderer.py (rig state -> a frame) and modes.py (LaunchpadMode).
-Those are the next layer up; the driver beneath them now exists and is tested.
+    modes.py         which surface a RigState shows. A table, not string munging.
+    renderer.py      state + animation + presses -> 81 LedSpecs. Pure.
+
+Phase 3's modules are all present. What has never happened is any of it running
+against the device: the exit test (connect, survive 20 replugs, a press arriving as
+a named action) needs the Beelink.
 
 The rule that shapes this package: nothing here may import from tools/. The bench
 instruments proved the protocol against real hardware, and that knowledge is PORTED

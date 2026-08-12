@@ -312,18 +312,23 @@ launchpad/
 □ Animation can be cancelled mid-run
 ```
 
-**STATUS: THE REAL GAP.** Present: `grid.py` and `colors.py` (measured constants, Phase 1),
-plus `animations.py`, `mappings.py`, `player.py` — all pure, all tested off-rig.
+**STATUS: MODULES COMPLETE, NEVER RUN ON THE DEVICE.**
 
-**Absent: `ports.py`, `device.py`, `renderer.py`, `modes.py`** — everything that actually
-opens the device and drives it. Nothing in the repo has ever sent a byte to a Launchpad
-outside `tools/`, where the bench instruments proved the whole protocol works.
+```text
+ports.py         name -> USB interface. Pure, no mido.          DONE 2026-08-12
+device.py        open, Programmer Mode, IO, RESTORE             DONE 2026-08-12
+backend_mido.py  the only module importing mido                 DONE 2026-08-12
+renderer.py      state + animation + presses -> 81 LedSpecs     DONE 2026-08-12
+modes.py         RigState -> which surface                      DONE 2026-08-12
+grid.py colors.py                                MEASURED on hardware, Phase 1
+mappings.py animations.py player.py              ported from the Config Lab
+```
 
-The bench tools are the head start: `tools/_bench.py` already contains a working port
-classifier (Windows multi-port aware), the connect/restore lifecycle, the SysEx vocabulary
-and the rtmidi ignore-types fix. `device.py` is largely that code promoted from a throwaway
-instrument to a supported module — with the layering rule enforced: tools may not be
-imported, so it gets ported, not referenced.
+53 new tests, 427 passing, all off-rig behind a fake MIDI backend.
+
+**What is NOT done is the part that needs the Beelink.** Nothing in `launchpad/` has
+ever opened a real port — every byte this project has sent came from `tools/`. The
+checklist below is the exit test and none of it has run.
 
 **Risk: Medium.** The reconnect + SysEx path is the single most common way this rig dies on
 stage. Test it 20 times, not twice.

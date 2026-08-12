@@ -93,6 +93,11 @@ _STATE_BOOTLOADER = 0x11
 PROGRAMMER_MODE_SETTLE_S = 0.1
 
 
+def _clamp7(value: int) -> int:
+    """Into 0-127. Anything above corrupts the SysEx stream, not just the colour."""
+    return max(0, min(127, int(value)))
+
+
 class Lighting(Enum):
     """LED Lighting <colourspec> types. p.15."""
 
@@ -110,8 +115,15 @@ class LedSpec:
     colour: int = colors.OFF
     lighting: Lighting = Lighting.STATIC
     colour_b: int | None = None  # FLASHING only: the colour it alternates with
+    rgb: tuple[int, int, int] | None = None  # RGB only: 0-127 per channel (p.15)
 
     def payload(self) -> tuple[int, ...]:
+        """The <colourspec> bytes for this LED. p.15: type, index, then 1-3 data bytes."""
+        if self.lighting is Lighting.RGB:
+            r, g, b = self.rgb or (0, 0, 0)
+            # 7-bit clamp is not cosmetic: a byte >= 0x80 inside a SysEx payload
+            # terminates the message early and corrupts everything after it.
+            return (self.lighting.value, self.index, _clamp7(r), _clamp7(g), _clamp7(b))
         if self.lighting is Lighting.FLASHING:
             return (self.lighting.value, self.index, self.colour, self.colour_b or colors.OFF)
         return (self.lighting.value, self.index, self.colour)

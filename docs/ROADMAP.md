@@ -178,10 +178,7 @@ Python fixes it.
 ■ Launchpad X Programmer's Reference Guide downloaded to /docs   ← DONE 2026-08-07
 ```
 
-**Risk: Low.**
-
-**STATUS: BUILT AND GREEN.** `set_browser/{scanner,models,metadata,pagination,service}.py`,
-covered by `tests/test_{scanner,metadata,pagination,set_browser_service}.py`. Manual work only.
+**Risk: Low.** Manual work only.
 **Exit test: PARTIAL — 15 of 30 minutes, 2026-08-12.** Heavy NAM + IR chain, no
 crackles, CPU clock held at ~3.1 GHz with no throttling, EVO and Launchpad present
 throughout. Stopped early by choice; a re-test is owed with the real set anyway.
@@ -365,6 +362,9 @@ set_browser/
 ■ Empty folder shows an error state, does not crash              ← LOGIC DONE 2026-08-09 (`is_empty` exposed; the Error Mode *display* is Phase 3)
 ■ Rescan works without restarting the controller                 ← DONE 2026-08-09 (same service object; preserves page, clamps when sets vanish)
 ```
+
+**STATUS: BUILT AND GREEN.** `set_browser/{scanner,models,metadata,pagination,service}.py`,
+covered by `tests/test_{scanner,metadata,pagination,set_browser_service}.py`.
 
 **Risk: Low.**
 

@@ -48,7 +48,7 @@ Revised 2026-08-07 after obtaining the Programmer's Reference Manual. Details an
 | Batch LED write in one SysEx | `launchpad/renderer.py` | ✅ **MEASURED ON HARDWARE** 2026-08-12 — 81 pads, one message, whole surface | Animations stutter; Bome gets more attractive |
 | Grid notes 11–88 | `launchpad/grid.py` | ⚠️ Corners p.14 + 7 interior notes measured 2026-08-12, all fit the rule | Every pad mapping, every renderer |
 | CC frame 91–98 / 19–89 | `launchpad/grid.py` | ✅ **MEASURED 2026-08-12** — 16/16 exact, zero mismatches. Logo 99 lights but is NOT a button | Pagination and System Mode access |
-| Colour index values | `launchpad/colors.py` | ❌ Unverified — page image; 8 indices confirmed | All LED feedback and animations |
+| Colour index values | `launchpad/colors.py` | ✅ **8/8 IN USE VERIFIED** on hardware 2026-08-12. Other 120 unread (p.12 is an image) but nothing references them — `tools/palette_coverage.py` guards that | All LED feedback and animations |
 | Beelink Wi-Fi supports hosted hotspot | §32 | ❌ Unverified | Loses offline SSH lifeline |
 | Ableton exe path | `rig.yaml` | ❌ Unverified | Nothing launches |
 
@@ -182,8 +182,11 @@ tools/
 │   └── top row 91-98 and right column 19..89, 16/16 exact. Logo 99 = LED only, no button
 □ Full 8×8 interior sweep → commit as launchpad/grid.py
 │   └── 3 corners from the manual + 7 interior notes measured; no contradictions yet
-□ Colour index recorded → commit as launchpad/colors.py
-│   └── compare against docs/colour-palette-candidate.json, record every difference
+■ Colour indices in use recorded — DONE 2026-08-12, 8/8 confirmed by eye
+│   └── 0 off · 5 red · 13 yellow · 19 green · 21 bright green · 23 dim green
+│       · 37 cyan · 45 blue. All match the Mini MK3 candidate table
+│   └── the other 120 stay candidates; palette_coverage.py fails the build if a
+│       config ever starts depending on one of them
 ■ Release semantics confirmed (note-on vel 0)                   ← DONE, manual p.6
 ■ Batch LED write                                               ← DONE, 81 entries/msg, p.15
 □ Port list recorded — exact Windows name strings for both interfaces

@@ -127,6 +127,44 @@ carrying a table.
 > pressable. It is not. `renderer.py` may paint it; `mappings.py` must never bind an action
 > to it, and any layout that puts a function there is a layout with a dead control.
 
+### Colour palette — closed for every colour the rig uses
+
+Read off the device by eye, bottom row left to right, 2026-08-12:
+
+| Index | Manual's prose | Observed |
+|---|---|---|
+| 0 | blank / off | dark ✅ |
+| 5 | red | red ✅ |
+| 13 | yellow | yellow ✅ |
+| 19 | green | green ✅ |
+| 21 | bright green | bright green ✅ |
+| 23 | dim green | dim green ✅ |
+| 37 | turquoise | cyan ✅ |
+| 45 | blue | blue ✅ |
+
+Eight for eight. These are the only palette entries the manual states in *text*; p.12 is an
+image, so the other 120 remain unread.
+
+**But the other 120 do not currently matter.** The five configs and three animations in this
+repo reference exactly 8 palette indices — and they are the same 8. Coverage is 100%, verified
+against the hardware:
+
+```text
+  0 off · 5 red · 13 yellow · 19 green · 21 bright green · 23 dim green · 37 cyan · 45 blue
+```
+
+So `colors.py` can ship with every colour the rig actually paints measured, and the remaining
+120 left as clearly-labelled candidates. Phase 1's exit test is about no guess being
+*load-bearing*, and none is.
+
+That coverage is an accident of the current configs and will not survive the first person who
+picks a nicer colour in the Config Lab. `tools/palette_coverage.py` re-checks it and exits
+non-zero when a config starts depending on an index nobody has seen lit.
+
+All 8 also match `docs/colour-palette-candidate.json`, which was sampled from the **Launchpad
+Mini MK3** manual. Eight agreements out of eight is encouraging about the other 120 and is not
+proof of them — the file stays labelled as a candidate.
+
 ### 8×8 grid — partially confirmed
 
 Casual pressing produced notes **27, 28, 37, 55, 66, 76, 77** — every one fits

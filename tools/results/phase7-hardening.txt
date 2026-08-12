@@ -65,3 +65,50 @@ defender:
 # The fix is to point the plugin at C:\LiveRig\namirs and get the library out of
 # OneDrive entirely. Verify inside the NAM/Gateway plugin which path it is
 # actually loading from -- that is the one that matters, not which copy exists.
+
+# ============================================================================
+# UPDATE — OneDrive and Edge autolaunch disabled, 2026-08-12
+# ============================================================================
+#
+# Removed from HKCU\...\Run, both backed up verbatim to
+# HKCU\SOFTWARE\ablepad-disabled-startup:
+#     OneDrive                              "...\OneDrive.exe" /background
+#     MicrosoftEdgeAutoLaunch_699D2291...   msedge.exe --no-startup-window --win-session-start
+#
+# Six OneDrive scheduled tasks disabled (Startup, Reporting, Standalone Update
+# x2 SIDs each). HKCU Run key is now EMPTY.
+#
+# NOT done, deliberately: OneDrive is not uninstalled and the account is not
+# unlinked. Stopping it from running is reversible in seconds; unlinking moves
+# files and is not.
+
+# --- WHAT THIS DID NOT CHANGE, AND WHY IT MATTERS ---
+# Known Folder Move is still in effect. These still point into OneDrive:
+#     Documents  ->  C:\Users\rigma\OneDrive\Documents
+#     Desktop    ->  C:\Users\rigma\OneDrive\Desktop
+#     Pictures   ->  C:\Users\rigma\OneDrive\Pictures
+#     (Music and Downloads are NOT redirected)
+#
+# That is fine now that sync is off -- those are ordinary local directories and
+# all 329 files remain readable. But it explains two things:
+#   1. how the NAM library ended up duplicated into OneDrive\Documents
+#   2. where Ableton's User Library lives:
+#          C:\Users\rigma\OneDrive\Documents\Ableton     <- EXISTS
+#          C:\Users\rigma\Documents\Ableton              <- does not
+#
+# Anything Ableton saves to its default location therefore lands under the
+# OneDrive directory. Harmless with sync off; a live hazard if sync is ever
+# re-enabled, because Files On-Demand can dehydrate those files and the rig is
+# specified to run with no internet.
+
+# --- PLACEHOLDER AUDIT, taken BEFORE disabling sync ---
+#     329 files under C:\Users\rigma\OneDrive
+#       1 cloud-only placeholder: 'Getting started with OneDrive.pdf'
+# Nothing of consequence was dehydrated, so cutting sync stranded nothing. Had
+# this been run a month later, that might not have been true -- which is the
+# argument for doing it now rather than at load-in.
+
+# --- STILL LEFT ALONE ---
+#     MicrosoftEdgeUpdateTaskMachineCore      (Edge updater, still running)
+#     USER_ESRV_SVC_QUEENCREEK                (Intel telemetry)
+#     SecurityHealth / RtkAudUService / RTHDVCPL

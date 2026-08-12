@@ -403,9 +403,15 @@ Beelink's adapter supports it before committing to the design.
 │   └── Intel Graphics Run entry removed, backed up to
 │       HKLM\SOFTWARE\ablepad-disabled-startup
 │   └── tools/results/phase7-hardening.txt
-□ OneDrive: NAM library is duplicated into OneDrive\Documents\namirs. On an
-│   offline rig, Files On-Demand placeholders would fail to load mid-set.
-│   Point the plugin at C:\LiveRig\namirs and get it out of OneDrive
+■ OneDrive + Edge autolaunch disabled — DONE 2026-08-12. Run entries removed and
+│   backed up, six OneDrive scheduled tasks disabled. HKCU Run key now empty.
+│   Placeholder audit taken first: 1 of 329 files was cloud-only, and it was the
+│   OneDrive welcome PDF — nothing was stranded
+□ Known Folder Move still redirects Documents/Desktop/Pictures into the OneDrive
+│   directory. Harmless with sync off, but Ableton's User Library lives at
+│   C:\Users\rigma\OneDrive\Documents\Ableton. Decide whether to un-redirect
+□ Confirm which namirs path the NAM/Gateway plugin actually loads from —
+│   C:\LiveRig\namirs is the copy that should win
 □ Notifications, update reboots, remaining startup apps disabled
 □ Notifications, update reboots, startup apps disabled
 □ Cold boot with monitor attached → rig reaches Set Browser unaided

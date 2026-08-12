@@ -324,7 +324,38 @@ unreachable, and it is also what a warranty claim needs.
    the physical port used.
 5. Measure **real round-trip latency** on the Beelink and write down the buffer size and sample
    rate chosen. Phase 0 exit test.
-6. Confirm whether **ASIO buffer/sample rate can be set without the tray app's UI** — if not,
-   changing them on a headless rig requires SSH plus a remote desktop, and that is worth
-   knowing before it is needed.
+6. ~~Confirm whether ASIO buffer/sample rate can be set without the tray app's UI~~ —
+   **ANSWERED 2026-08-12, and the answer is no.** Searched, with the interface live:
+
+   - `HKLM\SYSTEM\CurrentControlSet\Enum\TUSBAUDIO_ENUM\VID_2708&PID_0007&KS\…` — device
+     identity only, no audio settings
+   - `HKLM\SYSTEM\CurrentControlSet\Services\audientusbaudio\ParametersDriver` — licensing
+     blobs, nothing about buffers
+   - `HKLM\SOFTWARE\WOW6432Node\Audient` — install paths and driver version only
+   - `%APPDATA%\Audient\EVO\state.xml` — 235 bytes, GUI preferences only
+     (`gui-type`, `show-product-reg`). No buffer, no sample rate.
+   - Shipped binaries: `EVO.exe`, `AudientAppLauncher.exe`, `audientusbaudioapi.dll`,
+     `audientusbaudioasio.dll`. No CPL, no documented command-line surface.
+
+   **Buffer size and sample rate are reachable only through a GUI** — Ableton's
+   *Preferences → Audio → Hardware Setup*, or the EVO tray app. Nothing persists them
+   anywhere a script can reach, so nothing can assert them at boot the way the Launchpad's
+   settings can be asserted by SysEx (`launchpad-x-sysex.md` §8).
+
+   **Phase 7 consequence, and it is a real one.** On a screenless rig these values cannot be
+   changed, checked, or repaired without attaching a monitor or driving a remote desktop.
+   Three options, decide deliberately:
+
+   1. **Freeze them.** Set buffer and sample rate once with a screen attached, capture the
+      system image, and treat them as immutable. Simplest, and it matches the appliance
+      philosophy — but a venue that needs a different buffer is then a venue that needs a
+      monitor.
+   2. **Ship a remote desktop** alongside SSH as part of the Phase 6 lifeline. More moving
+      parts, one more thing to fail, but it makes every GUI-only setting reachable.
+   3. **Reverse-engineer the ASIO control interface.** `audientusbaudioasio.dll` is a COM
+      object with a documented ASIO `controlPanel()` entry point. High effort, undocumented,
+      and exactly the kind of thing §5 of CLAUDE.md says to label High risk. Not recommended.
+
+   Option 1 unless something forces otherwise. Whichever is chosen, record it — this is
+   the first design constraint the rig cannot code its way out of.
 7. Update **firmware and driver at bench**, record both versions, then take the rig offline.

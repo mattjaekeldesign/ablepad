@@ -25,6 +25,14 @@ rig:
                          # this floor exists. Was 5, which completed boot 1.25 s
                          # BEFORE Live had a window; 8 covers the last marker with
                          # margin. tools/measure_load.py reproduces this.
+                         #
+                         # VERIFIED BY EAR 2026-08-13: a guitar note played the
+                         # instant the Launchpad entered Set Browser spoke cleanly,
+                         # no stumble. That is the only test that proves anything --
+                         # every marker above is a proxy, and none of them can tell
+                         # silence from sound. Re-run it after any change to the
+                         # performance set, and raise this number rather than chase
+                         # the signal if the first note ever stumbles.
   boot_settle_s: 25      # NOW A FALLBACK, not the normal path. With the Ablepad
                          # Remote Script installed, boot completes on Live's own
                          # confirmation instead -- MEASURED 2026-08-13: 5.03 s from

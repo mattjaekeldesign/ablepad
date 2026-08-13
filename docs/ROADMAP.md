@@ -651,6 +651,22 @@ Each session, answer before writing code:
   trigger is someone's unsaved session). After the fix: 5 entries swept, no dialog,
   `ableton_audio` bound in 4 s, boot complete. Before it: 90 s timeout, every time.
 
+- **RESOLVED 2026-08-13 — the settle timer is no longer a guess.** `boot_settle_s`
+  was a wall-clock guess covering the slowest imaginable set on every boot. The
+  Ablepad Remote Script now writes a handshake when a set finishes loading, and the
+  gate reads it: **boot went 25 s → 8.0 s**, and the log states which path it took.
+
+  `boot_floor_s` (8 s) is what remains of the caution, and it is measured rather
+  than felt: the signal fires at 4.61 s but Live's window does not exist until
+  6.25 s, so the signal is optimistic by ~1.6 s and the floor covers the last
+  objective marker plus margin. A floor below 6.25 s completes boot before Live has
+  a UI, which 5 s was doing.
+
+  Verified by ear: a note played the instant the Launchpad entered Set Browser spoke
+  cleanly. That is the only test that proves it — every software marker is a proxy
+  and none can distinguish silence from sound. `tools/measure_load.py` reproduces
+  the timings.
+
 - **The readiness Remote Script lives inside the Live installation, so Live updates
   delete it.** MEASURED 2026-08-13 on Live 12.4.3: only
   `C:\ProgramData\Ableton\Live 12 Suite\Resources\MIDI Remote Scripts\` is listed in

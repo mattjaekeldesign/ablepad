@@ -624,23 +624,38 @@ Each session, answer before writing code:
 - No plugin can be trusted to stay silent forever. Archive installers and freeze versions.
 - LED flash/pulse are beat-clock slaved, not wall-clock. Any timing-critical feedback must be
   host-driven or the rig must never send clock to the Launchpad.
-- **Force-killing Ableton can wedge the next launch.** OBSERVED 2026-08-13: after a
-  `Stop-Process -Force`, the relaunched Live sat at 3.7 s CPU, `Responding: True`, with ZERO
-  top-level windows and the Audient ASIO DLL never mapped. It never reached the audio engine,
-  so `ableton_audio` never passed and the boot gate correctly failed to ERROR after 90 s.
-  This matters because `SetBrowserControl` calls `launcher.stop()` before every set change,
-  and on Windows that stop is a hard kill *today*. `launcher.stop()` reads as graceful-then-
-  kill, but `PsutilProcessController.terminate_gracefully()` calls `psutil.terminate()`, which
-  on Windows is `TerminateProcess` — the same call as `kill()`. The module docstring
-  (`ableton/process.py:16`) already says so. There is currently no graceful path on the target
-  OS, so the "graceful first" branch is graceful in name only.
+- **The controller MUST run in the logged-on user's session.** RESOLVED 2026-08-13, and the
+  single most expensive lesson of that session. A controller started over SSH runs in Windows
+  **session 0**, the non-interactive services session, and every process it spawns inherits
+  that. Ableton then runs with no desktop and no access to the user's audio endpoints: alive,
+  `Responding: True`, ZERO top-level windows, Audient ASIO DLL never mapped, silent. The boot
+  gate correctly failed to ERROR after 90 s, which is the gate working, not a bug.
 
-  So the wedge above is reachable by the ordinary set-switch path, not just by my manual
-  `Stop-Process`. **Do not trust set switching on stage until this is fixed.** The fix is a
-  real close request — `taskkill /PID n` without `/F`, or WM_CLOSE to Live's main window —
-  with the existing timeout falling back to `kill()`. That also needs an answer for Live's
-  "save changes?" prompt, which is why it was deferred; a set that is never edited should
-  not raise one.
+  This is why the rig is launched by scheduled task `ablepad-rig`, registered `/it`
+  (interactive only) `/rl highest`, running `C:\LiveRig\Controller\run-rig.bat`. Same shape
+  Phase 7 needs anyway. **Never start the controller from an SSH shell** — it looks like it
+  works, and produces a rig that makes no sound.
 
-  UNVERIFIED: whether a genuinely graceful stop avoids the wedge. The rig went offline
-  mid-test before it could be retried.
+  Corrects an earlier entry that blamed a force-kill for the wedge: the zero-window symptom
+  was session isolation, and a clean reboot reproduced it with no kill involved.
+
+  `/rl highest` matters for a second reason: both elevated means the controller can post
+  `WM_CLOSE` to Live. An unelevated process closing an elevated Live gets `Access is denied`
+  (UIPI).
+
+- **Live's recovery dialog will block a headless boot unless it is cleared.** RESOLVED
+  2026-08-13. `%APPDATA%\Ableton\Live <ver>\Preferences\CrashRecoveryInfo.cfg` plus `Undo\`
+  is the trigger; `Preferences\Crash\<stamp>_*` is only an ARCHIVE that Live copies out of
+  the root at startup. Sweeping the archive alone changes nothing — verified the hard way.
+  `ableton/crash_recovery.py` moves both aside before launch (moves, never deletes: the
+  trigger is someone's unsaved session). After the fix: 5 entries swept, no dialog,
+  `ableton_audio` bound in 4 s, boot complete. Before it: 90 s timeout, every time.
+
+- **`psutil.terminate()` is not graceful on Windows.** It is `TerminateProcess`, the same
+  syscall as `kill()`. `terminate_gracefully()` was therefore a hard kill wearing a polite
+  name, and since `SetBrowserControl` stops Live before every set change, every ordinary set
+  switch armed the recovery dialog for the next boot. Now posts `WM_CLOSE` via `taskkill`
+  without `/F`. Remaining risk: a set with unsaved changes raises Live's "save changes?"
+  prompt, which nothing headless can answer — that run burns the 10 s timeout and is then
+  killed, i.e. no worse than before. Performance sets are not edited; timeouts in the log
+  mean something is modifying sets at runtime, and that is the bug to chase.

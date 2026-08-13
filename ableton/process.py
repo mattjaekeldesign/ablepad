@@ -21,7 +21,7 @@ KNOWN LIMITS — recorded, not hidden
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
@@ -39,6 +39,17 @@ class ProcessController(Protocol):
 
     def is_running(self, handle: ProcessHandle) -> bool: ...
 
+    def exit_code(self, handle: ProcessHandle) -> int | None:
+        """
+        How the process ended: 0 clean, non-zero crashed, None unknown/still running.
+
+        The rig has to tell "Matt quit Live to get back to the launcher" from "Live
+        died mid-set". They are the same event -- the process is gone -- and only the
+        exit code separates them. Guessing wrong either relaunches a set someone
+        deliberately closed, or shrugs at a crash.
+        """
+        ...
+
     def terminate_gracefully(self, handle: ProcessHandle, timeout_s: float) -> bool:
         """Ask nicely, wait. True if it exited. False means kill() is next."""
         ...
@@ -46,6 +57,7 @@ class ProcessController(Protocol):
     def kill(self, handle: ProcessHandle) -> None: ...
 
 
+@dataclass
 class PsutilProcessController:
     """
     The real adapter. UNVERIFIED on Windows until the Phase 5 bench session —
@@ -53,10 +65,16 @@ class PsutilProcessController:
     confirmation, not a debugging session.
     """
 
+    #: pid -> the Popen we started it with, kept ONLY so exit_code() can work.
+    #: psutil can tell you a stranger's process is gone but not how it ended; the
+    #: Popen object is the only thing that remembers.
+    _started: dict[int, object] = field(default_factory=dict, init=False)
+
     def start(self, exe: Path, argument: Path) -> ProcessHandle:
         import psutil
 
         process = psutil.Popen([str(exe), str(argument)])
+        self._started[process.pid] = process
         log.info("started %s (pid %d) with %s", exe.name, process.pid, argument.name)
         return ProcessHandle(pid=process.pid, exe=str(exe))
 
@@ -153,3 +171,18 @@ class PsutilProcessController:
             psutil.Process(handle.pid).kill()
         except psutil.NoSuchProcess:
             pass
+
+    def exit_code(self, handle: ProcessHandle) -> int | None:
+        """
+        None while running, or if this controller did not start it (an ADOPTED
+        Ableton has no Popen behind it, so how it ends is genuinely unknowable --
+        and saying None is better than inventing a zero and treating every crash as
+        a deliberate quit).
+        """
+        process = self._started.get(handle.pid)
+        if process is None:
+            return None
+        try:
+            return process.poll()
+        except Exception:  # noqa: BLE001
+            return None

@@ -52,6 +52,12 @@ class RigSection:
 class LaunchpadSection:
     brightness: int  # 0-127, asserted at boot via SysEx 08h (manual p.25)
     port_contains: str  # substring both port names must carry, from rig_survey.py
+    #: Hand the Launchpad to Ableton once a set is up, so it behaves as a normal
+    #: Live controller. Requires "Launchpad X" enabled as a Control Surface in
+    #: Live's Preferences -- a manual step the rig cannot verify or perform, which
+    #: is why this is a switch and not an assumption. False keeps the rig on the
+    #: surface at all times (every phase before this).
+    handover_to_ableton: bool = True
 
 
 @dataclass(frozen=True)
@@ -153,6 +159,7 @@ def load_config(path: Path) -> RigConfig:
     if isinstance(brightness, int) and not 0 <= brightness <= 127:
         problems.append(f"launchpad.brightness must be 0-127 (SysEx data byte), got {brightness}")
     port_contains = want(lp_raw, "launchpad", "port_contains", str)
+    handover = lp_raw.get("handover_to_ableton", True)
 
     audio_raw = section("audio_interface")
     match_any = audio_raw.get("match_any")
@@ -189,7 +196,8 @@ def load_config(path: Path) -> RigConfig:
             boot_floor_s=float(boot_floor_s),
         ),  # type: ignore[arg-type]
         launchpad=LaunchpadSection(
-            brightness=int(brightness), port_contains=str(port_contains)  # type: ignore[arg-type]
+            brightness=int(brightness), port_contains=str(port_contains),  # type: ignore[arg-type]
+            handover_to_ableton=bool(handover),
         ),
         audio_interface=AudioSection(
             match_any=tuple(str(m) for m in match_any), require_status=str(require_status)

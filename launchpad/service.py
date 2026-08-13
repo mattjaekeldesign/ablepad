@@ -67,6 +67,11 @@ class LaunchpadService:
     settle_s: float | None = None
     identify_timeout_s: float | None = None
 
+    #: True while the surface has been deliberately handed to something else --
+    #: Ableton's own Launchpad X control surface. Distinct from "disconnected",
+    #: which is a fault: released means working as intended, so no retry, no
+    #: warning, and no attempt to reconnect until acquire() says so.
+    _released: bool = field(default=False, init=False)
     _device: LaunchpadDevice | None = field(default=None, init=False)
     _next_retry_at: float = field(default=0.0, init=False)
     _announced_loss: bool = field(default=False, init=False)
@@ -93,6 +98,8 @@ class LaunchpadService:
         Returns whether the device is usable right now. Never raises: a rig with no
         surface still has a show to finish.
         """
+        if self._released:
+            return False  # not a fault; somebody else is meant to have it
         if self.connected:
             return True
         if now < self._next_retry_at:
@@ -126,6 +133,47 @@ class LaunchpadService:
         self._announced_loss = False
         log.info("launchpad connected (connect #%d)", self._connects)
         return True
+
+    # -- handover ---------------------------------------------------------
+
+    @property
+    def released(self) -> bool:
+        return self._released
+
+    def release(self) -> None:
+        """
+        Hand the surface to Ableton: restore Live Mode and stop touching the device.
+
+        MUST restore Live Mode rather than merely closing the port. Programmer Mode
+        is device-wide state, and Live's Launchpad X script drives the Session
+        layout -- leaving the device in Programmer Mode hands Ableton a surface that
+        answers on the wrong layout and lights nothing where it expects.
+
+        Idempotent, and safe while already disconnected.
+        """
+        if self._released:
+            return
+        self._released = True
+        if self._device is not None:
+            log.info("releasing the launchpad to Ableton")
+            self._safe_close(self._device)
+            self._device = None
+        else:
+            log.info("launchpad marked released (nothing was connected)")
+
+    def acquire(self) -> None:
+        """
+        Take the surface back. The next tick reconnects and re-asserts Programmer Mode.
+
+        Reconnect runs the FULL init sequence, which matters more here than after a
+        replug: Ableton has been driving the device into DAW mode and its own layout,
+        so every setting this rig depends on is in an unknown state.
+        """
+        if not self._released:
+            return
+        log.info("re-acquiring the launchpad from Ableton")
+        self._released = False
+        self._next_retry_at = 0.0  # do not make the operator wait out a retry window
 
     def close(self) -> None:
         """Restore Live Mode and let go. Safe to call any number of times."""
@@ -175,6 +223,10 @@ class LaunchpadService:
         being held over — at 30 Hz that is the difference between a pad feeling
         instant and feeling like it has a delay on it.
         """
+        if self._released:
+            # Painting here would fight Ableton for the surface, and reading would
+            # steal presses meant for it. Both are silent, confusing failures.
+            return []
         self.ensure_connected(now)
         events = self.poll()
         if specs:

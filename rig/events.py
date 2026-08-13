@@ -94,6 +94,20 @@ class Tick(Event):
 
 
 @dataclass(frozen=True)
+class AbletonClosed:
+    """
+    Ableton exited CLEANLY -- somebody quit it on purpose.
+
+    Deliberately not AbletonCrashed. They are the same observation (the process is
+    gone) and opposite intentions: a crash wants a restart, a quit wants the rig to
+    take the Launchpad back and show the Set Browser. Restarting a set someone just
+    closed is the rig fighting its operator.
+    """
+
+    set_name: str
+
+
+@dataclass(frozen=True)
 class AbletonCrashed(Event):
     """The Live process vanished without being asked to. Supervisor decides next."""
 

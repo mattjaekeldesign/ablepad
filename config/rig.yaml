@@ -55,6 +55,21 @@ launchpad:
   brightness: 40         # UNVERIFIED sane-guess. Manual p.5: low brightness may be
                          # REQUIRED for the device to power on at all. Tune at bench.
   port_contains: "2 (LPX MIDI)"
+
+  # Hand the Launchpad to Ableton once a set is up, so it works as a normal Live
+  # controller and the rig's system pads get out of the way. The rig takes it back
+  # when Live exits, and STEALS it back for Error Mode -- silence has to be visible.
+  #
+  # REQUIRES a manual step the rig cannot perform or verify:
+  #   Live -> Preferences -> Link, Tempo & MIDI -> Control Surface: Launchpad X
+  #   Input / Output: the LPX ports WITHOUT "MIDIIN2"/"MIDIOUT2" in the name.
+  #
+  # That last part is the trap. Windows exposes four LPX ports; interface 1 is the
+  # DAW port Live wants, interface 2 is the rig's (see port_contains above). Giving
+  # Live interface 2 puts both on the same port and they will fight.
+  #
+  # false = the rig keeps the surface at all times (behaviour before 2026-08-13).
+  handover_to_ableton: true
   # MEASURED 2026-08-12. Windows reports four ports, ALL containing "LPX":
   #   interface 1 (DAW) : 'LPX MIDI 0'            'LPX MIDI 1'
   #   interface 2 (MIDI): 'MIDIIN2 (LPX MIDI) 1'  'MIDIOUT2 (LPX MIDI) 2'

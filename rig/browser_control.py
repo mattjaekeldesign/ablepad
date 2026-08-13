@@ -146,6 +146,13 @@ class SetBrowserControl:
                 live_set.display_name, exc,
             )
 
+    def forget_loaded(self) -> None:
+        """
+        Nothing is loaded any more. Called when Ableton exits, so the pad for the set
+        that was playing becomes pressable again instead of a silent no-op.
+        """
+        self._loaded = None
+
     def mark_loaded(self, path: Path) -> None:
         """Tell the control what boot already launched, so re-pressing it is a no-op."""
         self._loaded = path

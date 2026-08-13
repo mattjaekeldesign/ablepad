@@ -41,7 +41,8 @@ from rig.boot_checks import build_checks
 from rig.commands import CommandDispatcher
 from rig.controller import RigController
 from rig.mode_switch import ModeSwitch
-from rig.events import AbletonGaveUp, ActionRequested, EventBus
+from rig.surface_owner import SurfaceOwner
+from rig.events import AbletonClosed, AbletonGaveUp, ActionRequested, EventBus
 from rig.exceptions import ConfigError
 from rig.state import RigState, StateMachine
 from set_browser.service import SetBrowserService
@@ -108,6 +109,33 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     )
 
     supervisor = build_ableton(config, bus)
+
+    # Who drives the Launchpad. The rig is the launcher until a set is up; then
+    # Ableton's own Launchpad X script takes the surface and the system stuff gets
+    # out of the way. ERROR always takes it back -- see rig/surface_owner.py.
+    ownership = SurfaceOwner(enabled=config.launchpad.handover_to_ableton)
+
+    def ableton_ready() -> bool:
+        return supervisor is not None and supervisor.launcher.is_running()
+
+    surface.rig_owns_surface = lambda: ownership.rig_owns(machine.state, ableton_ready())
+    if not config.launchpad.handover_to_ableton:
+        log.info("launchpad handover disabled — the rig keeps the surface at all times")
+
+    def on_ableton_closed(event: AbletonClosed) -> None:
+        """
+        Somebody quit Live. Take the surface back and show the launcher.
+
+        This is the way back from a performance, now that the Launchpad belongs to
+        Ableton during one. Not an error and not a crash -- the supervisor already
+        told those apart by exit code.
+        """
+        log.info("Ableton closed (%s) — taking the launchpad back", event.set_name)
+        browser_control.forget_loaded()
+        if machine.state is not RigState.SET_BROWSER:
+            machine.transition(RigState.SET_BROWSER, f"ABLETON_CLOSED {event.set_name}")
+
+    bus.subscribe(AbletonClosed, on_ableton_closed)
 
     # Makes every config's SWITCH_MODE pad real. Without it the 'Browse' pad in
     # Performance mode arms, fires, and nothing happens -- the Set Browser exists but

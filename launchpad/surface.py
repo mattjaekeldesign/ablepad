@@ -86,6 +86,10 @@ class Surface:
     #: to paint which slots actually hold a set. Kept as callables so the surface
     #: never learns what a set is -- it asks, paints, and forgets.
     overrides_for: dict[str, "Callable[[], dict[int, dict]]"] = field(default_factory=dict)
+    #: Returns True while the RIG should be driving the surface, False while it
+    #: belongs to Ableton. Injected rather than computed here: the surface knows
+    #: about pads and modes, not about whether a DAW is running.
+    rig_owns_surface: "Callable[[], bool]" = field(default=lambda: True)
 
     _last_state: RigState | None = field(default=None, init=False)
     _held: dict[int, Hold] = field(default_factory=dict, init=False)
@@ -95,6 +99,8 @@ class Surface:
 
     def tick(self, now_ms: float) -> None:
         """One frame. Never raises: the service swallows device faults already."""
+        if not self._own_surface():
+            return
         config = self._config_for_current_state()
         self._arm_on_state_change(config, now_ms)
 
@@ -120,6 +126,33 @@ class Surface:
             self._on_pad(event, config, now_ms)
 
         self._expire_holds(now_ms)
+
+    def _own_surface(self) -> bool:
+        """
+        Take or release the device to match policy, and say whether to paint.
+
+        Releasing clears held pads and any running animation: a hold in progress
+        when the surface goes away must not fire two minutes later when it comes
+        back, and an animation resumed mid-frame on a device Ableton has been
+        driving would paint over its session view.
+        """
+        try:
+            rig_owns = bool(self.rig_owns_surface())
+        except Exception:  # noqa: BLE001 -- a bad policy must not blank the rig
+            log.exception("surface ownership check failed — keeping the surface")
+            rig_owns = True
+
+        if rig_owns:
+            self.service.acquire()
+            return True
+
+        if not self.service.released:
+            self.service.release()
+            self._held.clear()
+            self._pressed.clear()
+            self.player.cancel()
+            self._last_state = None  # so the next re-acquire re-arms its intro
+        return False
 
     # -- mode -------------------------------------------------------------
 

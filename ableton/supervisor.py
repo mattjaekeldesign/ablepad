@@ -23,7 +23,13 @@ from pathlib import Path
 
 from ableton.launcher import AbletonLauncher, LaunchRefused
 from ableton.recovery import RestartBudget
-from rig.events import AbletonCrashed, AbletonGaveUp, AbletonRestarted, EventBus
+from rig.events import (
+    AbletonClosed,
+    AbletonCrashed,
+    AbletonGaveUp,
+    AbletonRestarted,
+    EventBus,
+)
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +53,17 @@ class AbletonSupervisor:
         self._watching = None
         self._gave_up = False
 
+    def _exit_code(self) -> int | None:
+        """Best-effort exit code. Never raises into the tick loop."""
+        handle = self.launcher.handle
+        if handle is None:
+            return None
+        try:
+            return self.launcher.processes.exit_code(handle)
+        except Exception as exc:  # noqa: BLE001 -- an older controller may not have it
+            log.debug("no exit code available (%s) — treating as a crash", exc)
+            return None
+
     def poll(self) -> None:
         if self._watching is None or self._gave_up:
             return
@@ -55,7 +72,23 @@ class AbletonSupervisor:
             return
 
         live_set = self._watching
-        log.error("Ableton is gone (was playing %s)", live_set.name)
+
+        # A clean exit is somebody quitting Live on purpose -- the way back to the
+        # Set Browser now that the Launchpad is handed over during a set. Restarting
+        # it would be the rig overruling its operator, and it would do so instantly,
+        # so the set would appear to refuse to close.
+        #
+        # exit_code() is None for an ADOPTED Ableton (no Popen behind it), and None
+        # is treated as a crash: assuming "clean" would make every real crash
+        # silently unrecoverable, which is the more expensive way to be wrong.
+        code = self._exit_code()
+        if code == 0:
+            log.info("Ableton closed cleanly (was playing %s)", live_set.name)
+            self._watching = None
+            self.bus.publish(AbletonClosed(set_name=live_set.name))
+            return
+
+        log.error("Ableton is gone (was playing %s, exit code %s)", live_set.name, code)
         self.bus.publish(AbletonCrashed(set_name=live_set.name))
 
         if not self.budget.allow_restart():

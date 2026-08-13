@@ -396,6 +396,51 @@ covered by `tests/test_{scanner,metadata,pagination,set_browser_service}.py`.
 
 ---
 
+## Boot completion — the definition, and its limits
+
+Specified 2026-08-13 by the person who has to play through it:
+
+> "Boot complete means Ableton is up and running smoothly, connected to EVO sound,
+> with no complications — otherwise the error screen on the Launchpad."
+
+That is stricter than "the process exists", and it decomposes into checks of very
+different confidence. `rig/boot.py` keeps that difference visible rather than
+averaging it into a boolean.
+
+| Check | Confidence | How |
+|---|---|---|
+| Launchpad connected | CERTAIN | the service says so |
+| EVO 8 enumerated | CERTAIN | `VID_2708` on the USB bus |
+| Ableton process alive | CERTAIN | psutil |
+| Ableton bound to the EVO | **STRONG** | it has `audientusbaudioasio_x64.dll` loaded — it opened *that* driver, not another |
+| Set finished loading | **GUESS** | a settle timer. `ableton/readiness.py` calls it `ASSUMED_READY` on purpose |
+
+### What this gate can never prove
+
+**That audio is reaching the mixer.** There is no software answer. An ESD-wedged EVO
+enumerates perfectly, loads its driver, and outputs silence — its own manual says so
+(`docs/audient-evo-8-reference.md` §6). Ableton looks healthy throughout.
+
+So BOOT_COMPLETE means *"as ready as software can tell"*. The only real detector for
+silence is a human with ears, or a loopback measurement nobody has built. There is a
+test asserting no check claims otherwise, so this cannot be quietly "improved" into a
+lie later.
+
+**Failure names the check.** On a screenless rig, "EVO 8 missing" versus "Ableton not
+running" is the difference between checking a cable and checking a set. A generic red
+screen would waste the only minutes that matter.
+
+**A timeout is mandatory.** A rig sitting on the splash screen forever is
+indistinguishable, on a screenless machine, from one that has crashed.
+
+### Still to wire
+
+`rig/boot.py` is pure policy with injected probes, tested off-rig. The probes
+themselves — psutil, PnP enumeration, module inspection — are Windows-specific and
+belong with the Phase 6 `windows/` package, which does not exist yet.
+
+---
+
 ## Phase 5 — Ableton launcher
 
 ```text

@@ -308,12 +308,17 @@ launchpad/
 ```
 
 ```text
-□ Connects, and re-runs the full init sequence on every reconnect
-□ Restores Live mode in a finally block — on exit, exception AND signal
-□ Survives unplug/replug with no restart (ESD failure mode)
-□ Pad press → named action, not a raw note number
-□ Renderer is separate from device I/O
-□ Renderer emits one batched SysEx, not per-pad messages
+■ Connects, and re-runs the full init on every reconnect — PASS 2026-08-13
+│   └── 13 recorded cycles, all four forgotten settings re-asserted every time
+■ Restores Live mode in a finally block — PROVEN on hardware 2026-08-12 through an
+│   unhandled exception; the mode was read back off the device afterwards
+■ Survives unplug/replug with no restart — PASS 2026-08-13, ~20 physical replugs
+│   └── found a real bug: a lost device logged "COULD NOT RESTORE LIVE MODE" once
+│       per unplug, false twice over. tools/results/phase3-replug-test.txt
+◐ Pad press → named action — built (ActionRequested) and tested off-rig; NOT yet
+│   observed end-to-end on hardware
+■ Renderer is separate from device I/O — pure by construction, launchpad/renderer.py
+■ Renderer emits one batched SysEx — 81 specs per frame, measured on hardware
 □ Folder-scanner animation runs without blocking the event loop
 □ Animation can be cancelled mid-run
 ```
@@ -339,7 +344,9 @@ and keeps running — verified off-rig.
 a full-surface paint, and — through an unplanned crash — restore-to-Live-mode holding
 after an unhandled exception, confirmed by reading the mode back off the device.
 
-**NOT proven on hardware:** everything below. All twenty replug cycles were simulated.
+**PROVEN ON HARDWARE 2026-08-13:** the reconnect path. ~20 physical replugs, 13
+recorded cycles, every one re-asserting all four settings. Still owed: a press
+observed as a named action end-to-end, and an animation cancelled mid-run.
 
 **Risk: Medium.** The reconnect + SysEx path is the single most common way this rig dies on
 stage. Test it 20 times, not twice.

@@ -284,15 +284,33 @@ class LaunchpadDevice:
         log.info("programmer mode entered, device settings asserted")
         return self.identity
 
-    def close(self) -> None:
+    def close(self, restore: bool = True) -> None:
         """
-        Blank the surface and restore Live Mode. Idempotent — safe from both a
-        finally block and an atexit handler on the same run.
+        Let go of the device. Idempotent — safe from a finally block and an atexit
+        handler on the same run.
+
+        `restore=True` (the default) blanks the surface and returns the device to
+        Live Mode. That is the safety contract: Programmer Mode disables the
+        Launchpad's Setup menu, so a controller that exits without restoring strands
+        a headless rig.
+
+        `restore=False` is for a device that has ALREADY GONE — a yanked cable, an
+        ESD reset. Two reasons, and the second is the important one:
+
+          1. It cannot work. Every write fails; there is nothing on the other end.
+          2. It is not needed. The Launchpad powers on into Live Mode (manual p.18),
+             so a device that was unplugged is already back in Live Mode when it
+             returns. There is nothing to put right.
+
+        MEASURED 2026-08-13: without this distinction, a twelve-cycle replug test
+        logged "COULD NOT RESTORE LIVE MODE — the Setup menu stays disabled" twelve
+        times. Every one of those was false, and at a gig it is exactly the wrong
+        thing to read while looking for the real fault.
         """
         if self._restored:
             return
         self._restored = True
-        if self._out is not None:
+        if restore and self._out is not None:
             try:
                 self.clear()
                 self._send(CMD_PROGRAMMER_LIVE, 0)  # p.7 — THE line that matters
@@ -302,6 +320,8 @@ class LaunchpadDevice:
                     "COULD NOT RESTORE LIVE MODE (%s). The Setup menu stays disabled "
                     "until the Launchpad is unplugged and replugged.", exc
                 )
+        elif not restore:
+            log.debug("device already gone; skipping restore (it powers up in Live Mode)")
         for port in (self._in, self._out):
             try:
                 if port is not None:

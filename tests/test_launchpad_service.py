@@ -247,3 +247,52 @@ def test_tick_reads_before_it_paints():
     backend.inport.queue = [FakeMessage("control_change", control=91, value=127)]
     events = svc.tick(now=1.0, specs=[LedSpec(11, colors.RED)])
     assert [e.note for e in events] == [91]
+
+
+# --- a device that has GONE must not be "restored" -----------------------
+#
+# MEASURED 2026-08-13: a twelve-cycle replug test on real hardware logged
+#   "COULD NOT RESTORE LIVE MODE ... the Setup menu stays disabled"
+# twelve times. Every one was false. The device was already unplugged, and a
+# Launchpad powers on into Live Mode by itself (manual p.18), so there was nothing
+# to restore and nothing wrong. At a gig that message is the worst possible thing to
+# read while hunting the real fault.
+
+
+def test_losing_the_device_does_not_attempt_a_futile_restore(caplog):
+    import logging
+
+    backend = FakeBackend()
+    svc = service(backend)
+    svc.ensure_connected(0.0)
+    backend.unplug()
+    with caplog.at_level(logging.ERROR):
+        svc.poll()
+    assert "COULD NOT RESTORE" not in caplog.text, (
+        "the device is gone; claiming the Setup menu is stranded is false and alarming"
+    )
+
+
+def test_a_clean_close_still_restores():
+    backend = FakeBackend()
+    svc = service(backend)
+    svc.ensure_connected(0.0)
+    svc.close()
+    assert (*HEADER, CMD_PROGRAMMER_LIVE, 0) in backend.outport.sent
+
+
+def test_twenty_replugs_produce_no_false_alarms(caplog):
+    import logging
+
+    backend = FakeBackend()
+    svc = service(backend, retry_interval_s=0.0)
+    now = 0.0
+    with caplog.at_level(logging.ERROR):
+        for _ in range(20):
+            now += 1.0
+            svc.ensure_connected(now)
+            backend.unplug()
+            svc.poll()
+            backend.replug()
+    assert svc.stats["connects"] == 20
+    assert "COULD NOT RESTORE" not in caplog.text

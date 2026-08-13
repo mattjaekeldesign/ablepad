@@ -112,13 +112,13 @@ class LaunchpadService:
             if not self._announced_loss:
                 log.warning("launchpad unavailable: %s", exc)
                 self._announced_loss = True
-            self._safe_close(device)
+            self._safe_close(device, restore=False)
             return False
         except Exception as exc:  # noqa: BLE001 — a backend can fail in its own ways
             if not self._announced_loss:
                 log.error("launchpad connect failed unexpectedly: %s", exc)
                 self._announced_loss = True
-            self._safe_close(device)
+            self._safe_close(device, restore=False)
             return False
 
         self._device = device
@@ -189,16 +189,20 @@ class LaunchpadService:
         log.warning("launchpad lost while %s (%s) — will retry", doing, exc)
         device, self._device = self._device, None
         if device is not None:
-            self._safe_close(device)
+            # The device is gone. Do not try to restore Live Mode on it: the writes
+            # cannot land, and the device comes back in Live Mode by itself.
+            self._safe_close(device, restore=False)
         self._announced_loss = True
 
     @staticmethod
-    def _safe_close(device: LaunchpadDevice) -> None:
+    def _safe_close(device: LaunchpadDevice, restore: bool = True) -> None:
         """
         close() already swallows its own errors, but it runs on a device we may have
         just decided is gone. Belt and braces: nothing in the teardown path may raise.
+
+        restore=False when the device vanished — see LaunchpadDevice.close().
         """
         try:
-            device.close()
+            device.close(restore=restore)
         except Exception as exc:  # noqa: BLE001
             log.debug("ignoring error while closing a lost launchpad: %s", exc)

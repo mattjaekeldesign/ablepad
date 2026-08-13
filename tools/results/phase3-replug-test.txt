@@ -1,0 +1,49 @@
+# Phase 3 exit test — unplug/replug survival
+# Beelink RIG, Launchpad X firmware 0351, 2026-08-13
+# Harness: tools/replug_test.py (deployed to C:\LiveRig\Tools)
+
+RESULT: PASS
+
+  connects recorded : 13
+  losses recorded   : 12
+  cycles that re-asserted ALL FOUR settings : 13 of 13
+
+  Operator reports ~20 physical replugs and the surface changing colour on every
+  one. The harness counts a cycle only when it NOTICES the loss, and a fast replug
+  can complete inside the poll interval, so 13 is a floor rather than a ceiling.
+  Under-counting is the safe direction here: it cannot manufacture a pass.
+
+# --- what was actually verified ---
+# Not "it came back". The Launchpad forgets Programmer Mode, LED feedback, velocity
+# curve and aftertouch across a replug (manual p.18), so a reconnect that only
+# reopens the port yields a device that LOOKS attached and behaves like a different
+# instrument -- aftertouch flooding the loop, velocity varying, LED writes silently
+# doing nothing.
+#
+# The harness spied on every SysEx sent after each connect and required all four
+# commands (0x0E, 0x0A, 0x04, 0x0B) every cycle. 13 of 13.
+
+# --- the bug this test existed to find ---
+# Twelve times -- once per unplug -- the log said:
+#
+#   COULD NOT RESTORE LIVE MODE (MidiOutWinMM::sendMessage: error sending sysex
+#   message.). The Setup menu stays disabled until the Launchpad is unplugged and
+#   replugged.
+#
+# Every one of those was FALSE, and doubly so:
+#   1. the write could not land -- the device was already unplugged
+#   2. there was nothing to restore -- a Launchpad powers on into Live Mode
+#      (manual p.18), so the device was already back in Live Mode when it returned
+#
+# The message is the loudest thing in the log and it points at a problem that does
+# not exist. At a gig it is precisely the wrong thing to read while hunting a real
+# fault, and it would be read twelve times in four minutes.
+#
+# FIXED: LaunchpadDevice.close() takes restore=. The service passes restore=False
+# whenever the device vanished or a connect failed, and True only on a deliberate
+# shutdown. Three regression tests, including a twenty-cycle run asserting the log
+# stays clean.
+
+# --- still owed on hardware ---
+#   - a press arriving as a named action, observed end-to-end through main.py
+#   - the folder-scanner animation cancelled mid-run

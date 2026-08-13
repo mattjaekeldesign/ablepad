@@ -1,0 +1,28 @@
+# Names and colours for the Set Browser. Disk decides WHICH sets exist; this
+# file only decides what they look like on the grid.
+#
+# COLOURS MUST BE VERIFIED NAMES. launchpad/colors.py::_BY_NAME is the whole
+# vocabulary, and it holds only the eight indices a human has actually seen lit
+# on this Launchpad X. Anything else falls back to dim green and logs a warning
+# -- which is how "white" (the built-in default) behaves today, and why both
+# sets looked identical before this file existed.
+#
+#   off  red  yellow/amber/orange  green  bright green  dim green  cyan  blue
+#
+# Missing from this file is fine: a set on disk always appears, with its
+# filename as the name and the neutral colour.
+
+sets:
+  test.als:
+    name: Test
+    # Green reads as "this is the one that should be running". It is the boot
+    # set, so on a healthy rig this pad is the one already loaded.
+    color: green
+    category: candidate
+
+  emergency.als:
+    name: Emergency
+    # Red, and red is not used by any other slot. This is the set you reach for
+    # when something has already gone wrong, in the dark, without looking.
+    color: red
+    category: emergency

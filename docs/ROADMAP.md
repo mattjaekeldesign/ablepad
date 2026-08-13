@@ -624,3 +624,23 @@ Each session, answer before writing code:
 - No plugin can be trusted to stay silent forever. Archive installers and freeze versions.
 - LED flash/pulse are beat-clock slaved, not wall-clock. Any timing-critical feedback must be
   host-driven or the rig must never send clock to the Launchpad.
+- **Force-killing Ableton can wedge the next launch.** OBSERVED 2026-08-13: after a
+  `Stop-Process -Force`, the relaunched Live sat at 3.7 s CPU, `Responding: True`, with ZERO
+  top-level windows and the Audient ASIO DLL never mapped. It never reached the audio engine,
+  so `ableton_audio` never passed and the boot gate correctly failed to ERROR after 90 s.
+  This matters because `SetBrowserControl` calls `launcher.stop()` before every set change,
+  and on Windows that stop is a hard kill *today*. `launcher.stop()` reads as graceful-then-
+  kill, but `PsutilProcessController.terminate_gracefully()` calls `psutil.terminate()`, which
+  on Windows is `TerminateProcess` — the same call as `kill()`. The module docstring
+  (`ableton/process.py:16`) already says so. There is currently no graceful path on the target
+  OS, so the "graceful first" branch is graceful in name only.
+
+  So the wedge above is reachable by the ordinary set-switch path, not just by my manual
+  `Stop-Process`. **Do not trust set switching on stage until this is fixed.** The fix is a
+  real close request — `taskkill /PID n` without `/F`, or WM_CLOSE to Live's main window —
+  with the existing timeout falling back to `kill()`. That also needs an answer for Live's
+  "save changes?" prompt, which is why it was deferred; a set that is never edited should
+  not raise one.
+
+  UNVERIFIED: whether a genuinely graceful stop avoids the wedge. The rig went offline
+  mid-test before it could be retried.

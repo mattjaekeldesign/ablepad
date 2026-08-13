@@ -49,7 +49,11 @@ Write-Output "=== unused startup entries ==="
 foreach ($n in "RTHDVCPL", "RtkAudUService", "SecurityHealth") {
     $v = (Get-ItemProperty $run -Name $n -ErrorAction SilentlyContinue).$n
     if ($v) {
-        New-Item -Path $backup -Force | Out-Null
+        # NOT New-Item -Force: on an existing key that RECREATES it, discarding
+        # every value already saved. Done that -- it silently wiped two backups and
+        # left only the last entry, so the removals it was protecting became
+        # irreversible. Create only when missing.
+        if (-not (Test-Path $backup)) { New-Item -Path $backup -Force | Out-Null }
         Set-ItemProperty $backup -Name $n -Value $v
         Remove-ItemProperty $run -Name $n -ErrorAction SilentlyContinue
         Write-Output "  $n -> removed (backed up to $backup)"

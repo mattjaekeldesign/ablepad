@@ -51,6 +51,15 @@ class RigSection:
     #: hand that is already there, never a gate: an unattended rig powering up in a
     #: van must still reach a playable state on its own.
     boot_choice_s: float = 8.0
+    #: Wait INDEFINITELY at the Set Browser until a set is chosen, instead of
+    #: loading boot_set when boot_choice_s expires. boot_choice_s is then ignored.
+    #:
+    #: Matt's call, and it overrides the assumption this was built on: "live launched
+    #: auto which is a big no... i must be able to choose the set i want to boot
+    #: into". Launching the WRONG set is worse than launching nothing. The cost is
+    #: that a rig powering up unattended sits at the browser forever, which is the
+    #: right trade for an instrument somebody stands in front of.
+    boot_requires_choice: bool = True
 
 
 @dataclass(frozen=True)
@@ -169,6 +178,7 @@ def load_config(path: Path) -> RigConfig:
     boot_settle_s = rig_raw.get("boot_settle_s", 25.0)
     boot_floor_s = rig_raw.get("boot_floor_s", 5.0)
     boot_choice_s = rig_raw.get("boot_choice_s", 8.0)
+    boot_requires_choice = rig_raw.get("boot_requires_choice", True)
     if isinstance(tick_hz, int) and not 1 <= tick_hz <= 200:
         problems.append(f"rig.tick_hz must be 1-200, got {tick_hz}")
 
@@ -216,6 +226,7 @@ def load_config(path: Path) -> RigConfig:
             name=str(name), tick_hz=int(tick_hz),
             boot_timeout_s=float(boot_timeout_s), boot_settle_s=float(boot_settle_s),
             boot_floor_s=float(boot_floor_s), boot_choice_s=float(boot_choice_s),
+            boot_requires_choice=bool(boot_requires_choice),
         ),  # type: ignore[arg-type]
         launchpad=LaunchpadSection(
             brightness=int(brightness), port_contains=str(port_contains),  # type: ignore[arg-type]

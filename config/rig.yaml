@@ -20,6 +20,13 @@ rig:
                         # browser existed at boot and was unreachable at boot.
                         # It does NOT wait for input -- a rig powering up in a van
                         # must reach a playable state with nobody there. 0 = off.
+  boot_requires_choice: true
+                        # WAIT at the Set Browser until a set is chosen; never load
+                        # boot_set on a timer. "live launched auto which is a big
+                        # no... i must be able to choose the set i want to boot
+                        # into" -- launching the WRONG set is worse than launching
+                        # nothing. Cost: a rig powering up unattended sits at the
+                        # browser forever. false restores the boot_choice_s timeout.
   boot_floor_s: 8        # FLOOR, measured from launch. A Remote Script readiness
                          # signal is ignored until this has passed.
                          # MEASURED 2026-08-13 on test.als (Gateway with a NAM model

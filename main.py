@@ -334,6 +334,7 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         clock=time.monotonic,
         machine=machine,
         bus=bus,
+        require_choice=config.rig.boot_requires_choice,
     )
 
     def lifeline_tick() -> None:
@@ -362,6 +363,9 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         # Matt hit on the first cold boot. The default still loads, so an unattended
         # rig behaves as before; this only buys a few seconds for a hand that is
         # already there.
+        # Returning here also means the boot GATE is not evaluated, which is what
+        # stops its 90 s deadline running while the rig is waiting for a human.
+        # Otherwise waiting for a choice would become a boot failure.
         if choice_window.waiting(time.monotonic()):
             return
 

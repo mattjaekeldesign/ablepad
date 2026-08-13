@@ -9,12 +9,19 @@ WHY IT EXISTS
     belonged to Ableton. So the Set Browser existed at boot and was unreachable at
     boot -- "ableton auto boots so i never had the chance to choose a set".
 
-WHAT IT DOES, AND WHAT IT REFUSES TO DO
-    Shows the Set Browser for `seconds`, then lets boot carry on and load the
-    default. It does NOT wait for input: an unattended rig powering up in a van must
-    reach a playable state on its own, and a prompt nobody answers is a rig that
-    never starts. The window is a courtesy to a hand that is already there, not a
-    gate.
+WHAT IT DOES
+    Shows the Set Browser at startup so a set can be chosen before anything loads.
+
+    Two behaviours, and the default CHANGED on 2026-08-13 after the first real use:
+    originally it auto-loaded boot_set when the window expired, on the reasoning
+    that an unattended rig must reach a playable state on its own. Matt's verdict on
+    seeing it: "live launched auto which is a big no... i must be able to choose the
+    set i want to boot into". Launching the WRONG set is worse than launching
+    nothing, so rig.boot_requires_choice now defaults true and the rig waits.
+
+    The cost is real and accepted: a rig powering up unattended sits here forever.
+    That is the right trade for an instrument somebody stands in front of, and
+    boot_requires_choice=false restores the timeout for one that is not.
 
     Pressing a set during the window cancels it -- the press IS the choice, and
     counting down afterwards would either load two sets or ignore the one you asked
@@ -47,9 +54,13 @@ class BootChoice:
     clock: Callable[[], float]
     machine: StateMachine
     bus: EventBus
+    #: Wait until a set is chosen rather than loading the default when the window
+    #: expires. `seconds` is then only the point at which the log says so.
+    require_choice: bool = False
 
     _started_at: float | None = field(default=None, init=False)
     _done: bool = field(default=False, init=False)
+    _nagged: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         self.bus.subscribe(ActionRequested, self._on_action)
@@ -74,12 +85,23 @@ class BootChoice:
                 self._done = True
                 return False
             log.info(
-                "%.0fs to choose a set — the default loads on its own if nobody does",
-                self.seconds,
+                "choose a set%s",
+                ""
+                if self.require_choice
+                else " — the default loads on its own in %.0fs" % self.seconds,
             )
             return True
 
         if now - self._started_at >= self.seconds:
+            if self.require_choice:
+                # Nothing loads until a human picks. Said once, not every tick.
+                if not self._nagged:
+                    self._nagged = True
+                    log.info(
+                        "waiting for a set to be chosen — nothing loads until a pad "
+                        "is held (rig.boot_requires_choice)"
+                    )
+                return True
             log.info("no set chosen — loading the default")
             self._finish()
             return False

@@ -76,3 +76,31 @@ def test_it_does_not_stall_boot_if_the_browser_cannot_be_shown():
     machine.transition(RigState.SET_BROWSER, "setup")
     machine.transition(RigState.SHUTDOWN, "setup")
     assert choice.waiting(now[0]) is False
+
+
+def test_require_choice_waits_forever_rather_than_loading_the_default():
+    # "live launched auto which is a big no... i must be able to choose the set i
+    # want to boot into". Launching the WRONG set is worse than launching nothing.
+    now = [0.0]
+    bus = EventBus()
+    machine = StateMachine(bus=bus)
+    choice = BootChoice(seconds=8.0, clock=lambda: now[0], machine=machine, bus=bus,
+                        require_choice=True)
+    choice.waiting(now[0])
+    for t in (8.0, 60.0, 3600.0):
+        now[0] = t
+        assert choice.waiting(now[0]) is True, f"must still be waiting at {t}s"
+
+
+def test_require_choice_still_ends_the_moment_a_set_is_chosen():
+    now = [0.0]
+    bus = EventBus()
+    machine = StateMachine(bus=bus)
+    choice = BootChoice(seconds=8.0, clock=lambda: now[0], machine=machine, bus=bus,
+                        require_choice=True)
+    choice.waiting(now[0])
+    now[0] = 500.0
+    assert choice.waiting(now[0]) is True
+    bus.publish(ActionRequested(action="LOAD_SET", params={"slot": 0}, pad=81))
+    assert choice.waiting(now[0]) is False
+    assert choice.chosen is True

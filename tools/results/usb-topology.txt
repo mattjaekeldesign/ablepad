@@ -1,0 +1,40 @@
+# USB topology — Beelink RIG, 2026-08-12
+# All three rig devices present and enumerating simultaneously for the first time.
+
+root hub (Hub_#0001)
+├── Port_#0002 → Generic USB Hub 05E3:0608
+│                └── HID keyboard 0665:6000
+├── Port_#0003 → Generic USB Hub 1A40:0101
+│                ├── Port_#0001 → Ampero II Stage MIDI    84EF:0053   Status OK
+│                └── Port_#0003 → Ampero II Stage Audio   84EF:0052   Status Error (no driver — intended)
+│                                 Hotone Audio DFU        84EF:0052   Status Error (no driver — intended)
+├── Port_#0004 → Audient EVO 8                            2708:0007   Status OK   <- DIRECT, no hub
+└── Port_#0010 → Intel Wireless Bluetooth                 8087:0026
+
+    Generic USB Hub 1A86:8095
+    └── Launchpad X                                       1235:0109   Status OK
+
+# --- what is good about this ---
+# The EVO 8 is plugged straight into the machine rather than through a hub. That is
+# the right call for the audio interface: fewer hops, and the phantom-power budget
+# (manual p.22) depends on what the HOST port can deliver, not what a hub passes on.
+
+# --- what is still open ---
+# Whether that root port is USB-A or USB-C at 1.5 A. It decides whether 2 or 4
+# phantom channels work (EVO manual p.22) and is still an unticked Phase 0 checkbox.
+# Not answerable from software — it needs a look at the back of the Beelink.
+#
+# Both CONTROLLERS sit behind external hubs. The Launchpad is bus-powered and its
+# manual (p.5) warns low brightness may be REQUIRED for some hosts to power it at
+# all. If it ever fails to enumerate at boot, hub power is the first suspect, ahead
+# of the cable.
+
+# --- MIDI ports, three devices attached ---
+#   IN : 'Ampero II Stage MIDI 0'  'LPX MIDI 1'  'MIDIIN2 (LPX MIDI) 2'
+#   OUT: 'Microsoft GS Wavetable Synth 0'  'Ampero II Stage MIDI 1'
+#        'LPX MIDI 2'  'MIDIOUT2 (LPX MIDI) 3'
+#
+# Compare with two devices attached, an hour earlier:
+#   IN : 'LPX MIDI 0'  'MIDIIN2 (LPX MIDI) 1'
+#
+# The Launchpad's trailing index moved. See docs/launchpad-x-sysex.md.

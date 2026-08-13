@@ -80,6 +80,30 @@ The state byte after it (`01` = application) does match. A parser that validates
 rejects the real device — which is silent failure in the boot-time presence check, the one
 place the rig most needs the truth.
 
+### The port index moves. Do not match whole names.
+
+MEASURED on the same rig an hour apart, 2026-08-12:
+
+```text
+two devices attached     IN: 'LPX MIDI 0'             'MIDIIN2 (LPX MIDI) 1'
+three devices attached   IN: 'Ampero II Stage MIDI 0' 'LPX MIDI 1'  'MIDIIN2 (LPX MIDI) 2'
+```
+
+Plugging a Hotone Ampero into the rig **renumbered the Launchpad's ports**. mido appends
+a positional index to disambiguate duplicate names, and that index is a function of how
+many MIDI devices are enumerated and in what order — so it changes when any device is
+added, removed, or comes up differently after a reboot.
+
+Anything matching a full port name including that integer works on the bench and breaks
+in the van. Match the `MIDIIN<n>` / `MIDIOUT<n>` prefix instead: it encodes which USB
+interface the port belongs to, which is the actual question. `launchpad/ports.py` does
+this, and `tests/test_ports.py` pins both the two-device and three-device name sets so a
+future "simplification" back to whole-string matching fails loudly.
+
+Second-order trap in the same data: with three devices, **index 0 is the Ampero** — the
+slot the Launchpad's DAW port used to occupy. Any ordinal-based fallback would now grab
+the wrong device entirely.
+
 ### The trap that made input look dead
 
 **python-rtmidi discards SysEx by default.** `RtMidiIn` defaults to

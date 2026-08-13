@@ -127,9 +127,14 @@ def emit_literal(rec: Recorder, ins: list[Port], outs: list[Port]) -> None:
         rec.add("    },")
     rec.add("}")
     rec.add()
-    rec.add("# Match on these EXACTLY. Windows appends an index to MIDI port names and")
-    rec.add("# it can change across re-enumeration -- if that turns out to happen here,")
-    rec.add("# switch to a prefix match and record why.")
+    rec.add("# DO NOT match these strings whole. The trailing integer is POSITIONAL and")
+    rec.add("# MEASURED to move: on 2026-08-12 plugging in a Hotone Ampero renumbered the")
+    rec.add("# Launchpad from 'MIDIIN2 (LPX MIDI) 1' to 'MIDIIN2 (LPX MIDI) 2'. Adding,")
+    rec.add("# removing or re-enumerating any MIDI device shifts it.")
+    rec.add("#")
+    rec.add("# Match the MIDIIN<n>/MIDIOUT<n> prefix instead -- that encodes which USB")
+    rec.add("# interface the port belongs to, which is the thing actually being asked.")
+    rec.add("# launchpad/ports.py does this and has a regression test for the shift.")
 
 
 def main() -> int:

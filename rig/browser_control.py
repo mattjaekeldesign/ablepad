@@ -146,6 +146,11 @@ class SetBrowserControl:
                 live_set.display_name, exc,
             )
 
+    @property
+    def loaded(self) -> Path | None:
+        """The set currently playing, as far as the browser knows."""
+        return self._loaded
+
     def forget_loaded(self) -> None:
         """
         Nothing is loaded any more. Called when Ableton exits, so the pad for the set

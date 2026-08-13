@@ -50,6 +50,18 @@ class CommandDispatcher:
             )
         self._commands[command.name] = command
 
+    def knows(self, name: str) -> bool:
+        """
+        Is this a command we own?
+
+        Exists because ActionRequested carries EVERY named action the surface
+        resolves, most of which belong to other subscribers (LOAD_SET, SWITCH_MODE,
+        PAGE_NEXT). A subscriber that dispatched blindly would raise UnknownCommand
+        on the first set load. dispatch() still raises for a name nobody owns --
+        that is a wiring bug and must surface loudly.
+        """
+        return name in self._commands
+
     def dispatch(self, name: str, context: Mapping[str, object]) -> None:
         command = self._commands.get(name)
         if command is None:

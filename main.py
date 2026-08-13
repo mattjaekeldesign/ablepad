@@ -42,6 +42,7 @@ from rig.commands import CommandDispatcher
 from rig.controller import RigController
 from rig.mode_switch import ModeSwitch
 from rig.escape_hatch import EscapeHatch
+from rig.system_commands import Reboot, RestartAbleton, Shutdown
 from rig.surface_owner import SurfaceOwner
 from rig.events import AbletonClosed, AbletonGaveUp, ActionRequested, EventBus
 from rig.exceptions import ConfigError
@@ -80,9 +81,6 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     machine = StateMachine(bus=bus)
     machine_ref["m"] = machine
     dispatcher = CommandDispatcher()
-    # Commands register here as later phases add them. Empty still — and dispatch of
-    # anything therefore fails loudly, which is correct.
-    _ = dispatcher
 
     library, warnings = load_library(root / "configs", root / "animations")
     # Every RigState must have a surface BEFORE the loop starts. Discovered here it
@@ -157,6 +155,51 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
             machine.transition(RigState.SET_BROWSER, f"ABLETON_CLOSED {event.set_name}")
 
     bus.subscribe(AbletonClosed, on_ableton_closed)
+
+    # System Mode's pads, made real. They have existed in configs/system.json since
+    # the Config Lab and dispatched to nobody -- the same shape SWITCH_MODE was in.
+    # Reachable by holding pad 98 in the Set Browser, which is where the rig lands
+    # when Ableton is closed, so troubleshooting is one step from the failure.
+    if supervisor is not None:
+        from windows.power import WindowsPower  # noqa: PLC0415 -- platform import
+
+        dispatcher.register(
+            RestartAbleton(
+                launcher=supervisor.launcher,
+                # Resolved at press time: the loaded set changes, and a command that
+                # captured it at wiring time would restart whatever booted.
+                current_set=lambda: browser_control.loaded,
+            )
+        )
+        power = WindowsPower()
+        dispatcher.register(Reboot(power=power))
+        dispatcher.register(Shutdown(power=power))
+
+    def on_system_action(event: ActionRequested) -> None:
+        """
+        Route named actions to registered commands.
+
+        Unregistered names are IGNORED here rather than raised: every mode config
+        emits actions this dispatcher does not own (LOAD_SET, SWITCH_MODE, PAGE_NEXT
+        are handled by their own subscribers), and a rig that died on the first
+        LOAD_SET would be worse than one that logs an unknown name.
+        """
+        if not dispatcher.knows(event.action):
+            if event.action in UNIMPLEMENTED:
+                # A lit pad is a promise. This one cannot be kept yet, so say so out
+                # loud rather than let a press vanish -- silence is how you end up
+                # pressing it four times on stage wondering if the rig is dead.
+                log.warning(
+                    "%s (pad %d) is not implemented yet: %s",
+                    event.action, event.pad, UNIMPLEMENTED[event.action],
+                )
+            return
+        try:
+            dispatcher.dispatch(event.action, {"pad": event.pad, "params": event.params})
+        except Exception:  # noqa: BLE001 -- a bad command must not stop the tick loop
+            log.exception("command %s failed", event.action)
+
+    bus.subscribe(ActionRequested, on_system_action)
 
     def on_load_requested(event: ActionRequested) -> None:
         """A set is loading, so hand the surface back to Ableton once it is up."""
@@ -276,6 +319,18 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     )
     return controller, surface
 
+
+
+#: Actions a config declares that nothing implements, and WHY. Pressing one logs
+#: instead of vanishing. Empty is the goal; an entry here is a promise the surface
+#: is making that the rig cannot keep.
+UNIMPLEMENTED: dict[str, str] = {
+    "HOTSPOT_TOGGLE": (
+        "the Beelink's Intel AX101 reports 'Hosted network supported: No', so the "
+        "adapter cannot run an access point without an internet connection to share "
+        "— see docs/ROADMAP.md Phase 6"
+    ),
+}
 
 
 def _running_ableton() -> int | None:

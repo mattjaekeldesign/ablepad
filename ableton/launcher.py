@@ -30,7 +30,19 @@ from rig.exceptions import RigError
 
 log = logging.getLogger(__name__)
 
-GRACEFUL_CLOSE_TIMEOUT_S = 10.0
+#: How long to wait for Live to close before killing it. THREE seconds, not ten.
+#:
+#: The wait only runs long when Live is asking "save changes to <set>?" -- a modal
+#: nothing headless can answer, so every second past the first is silence on stage
+#: for an answer that is never coming. OBSERVED 2026-08-13: a set nobody edited put
+#: that prompt up, so this is the normal path, not an edge case.
+#:
+#: Killing after the timeout used to be expensive: it left Live's crash journal
+#: behind and armed the recovery dialog on next launch. ableton/crash_recovery.py
+#: now sweeps that before every launch, so the remaining cost of a kill is losing
+#: unsaved preference changes -- which matters right after using the Preferences
+#: window and not at all during a set switch.
+GRACEFUL_CLOSE_TIMEOUT_S = 3.0
 
 
 class AudioInterfacePresence(Protocol):

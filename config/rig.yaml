@@ -13,10 +13,18 @@ rig:
   tick_hz: 30            # MEASURED 2026-08-12: 899 consecutive ticks, zero overruns,
                          # each one rendering and pushing all 81 LEDs on the Beelink
   boot_timeout_s: 90     # how long the boot gate waits before showing Error Mode
-  boot_floor_s: 5         # FLOOR. A Remote Script readiness signal is ignored before
-                          # this. The hook that writes it is UNVERIFIED, so an early
-                          # signal must not be able to complete boot sooner than a
-                          # time we are willing to defend. Measure before lowering.
+  boot_floor_s: 8        # FLOOR, measured from launch. A Remote Script readiness
+                         # signal is ignored until this has passed.
+                         # MEASURED 2026-08-13 on test.als (Gateway with a NAM model
+                         # and IR loaded -- the plugin state is an opaque VST3 blob,
+                         # so the set looks empty in the XML and is not):
+                         #     asio    4.03 s
+                         #     signal  4.61 s   <- fires before the set is up
+                         #     window  6.25 s   <- Live's UI exists here
+                         # The signal is optimistic by 1.6 s, which is exactly why
+                         # this floor exists. Was 5, which completed boot 1.25 s
+                         # BEFORE Live had a window; 8 covers the last marker with
+                         # margin. tools/measure_load.py reproduces this.
   boot_settle_s: 25      # NOW A FALLBACK, not the normal path. With the Ablepad
                          # Remote Script installed, boot completes on Live's own
                          # confirmation instead -- MEASURED 2026-08-13: 5.03 s from

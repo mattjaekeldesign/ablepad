@@ -47,6 +47,15 @@ while ((Get-Date) -lt $deadline) {
     Start-Sleep -Milliseconds 500
 }
 
-Write-Output "STILL RUNNING after $TimeoutSeconds s — check the screen for a save prompt."
-Write-Output "Deliberately NOT killing it: a force kill here is what loses preferences."
+Write-Output "STILL RUNNING after $TimeoutSeconds s."
+Write-Output ""
+Write-Output "Almost certainly Live is showing 'Save changes to <set>?' -- click"
+Write-Output "Don't Save on the rig's screen and it will close."
+Write-Output ""
+Write-Output "Deliberately NOT killing it. This tool is for the operator sitting at"
+Write-Output "the machine, and the moment you most want to close Live by hand is"
+Write-Output "right after changing Preferences -- which is exactly what a force kill"
+Write-Output "discards. The RIG does escalate to a kill after"
+Write-Output "GRACEFUL_CLOSE_TIMEOUT_S, because on stage a dirty set must not cost"
+Write-Output "more than a moment of silence."
 exit 1

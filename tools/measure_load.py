@@ -196,11 +196,18 @@ def main(argv: list[str]) -> int:
         gap = latest - signal
         print("  signal fired %.2fs after launch" % signal)
         print("  last objective marker at %.2fs" % latest)
-        print("  GAP the floor must cover: %.2fs" % gap)
-        print("  -> boot_floor_s of %.0f would be %s" % (
-            max(5.0, gap + 2.0),
-            "a reasonable starting point (gap + 2s margin)",
+        print("  signal is optimistic by %.2fs" % gap)
+        print()
+        # boot_floor_s is measured from LAUNCH, not from the signal. An earlier
+        # version of this recommended gap + margin, which is the wrong quantity: it
+        # produced 5 s for a set whose window did not exist until 6.25 s, so boot
+        # completed before Live had a UI. The floor must cover launch -> playable.
+        print("  boot_floor_s is measured from LAUNCH, so it must cover the LAST")
+        print("  marker, not the gap:")
+        print("  -> boot_floor_s: %.0f   (last marker %.2fs + %.0fs margin)" % (
+            latest + 2.0, latest, 2.0,
         ))
+        print("  A floor below %.2fs completes boot before Live has a window." % latest)
     print("\n  These are proxies. Play a note and time it yourself before trusting")
     print("  any of them -- nothing here proves audio reaches the mixer.")
     return 0

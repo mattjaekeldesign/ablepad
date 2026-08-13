@@ -268,8 +268,19 @@ function ledFor(id) {
   const config = store.state.config
   if (!config) return { type: 'off' }
   const pad = config.pads?.[id]
-  if (store.state.sim && press?.padId === id && pad)
+  if (store.state.sim && press?.padId === id && pad) {
+    // A HELD pad shows hold progress, NOT its configured `pressed` colour. The rig
+    // does this in launchpad/holdfeedback.py, where the hold layer outranks
+    // `pressed` in the render stack -- a flat colour can say "you are touching
+    // this" but not "you are 60% of the way to loading a set".
+    //
+    // Mirrored here because this Lab is for LEARNING the rig, so a pad that looks
+    // different in the two places teaches the wrong thing. If you change the ramp
+    // or the thresholds, change them in both.
+    const ramp = holdRampSpec()
+    if (ramp) return ramp
     return pad.led?.pressed ?? pad.led?.idle ?? { type: 'off' }
+  }
   if (pad) return pad.led?.idle ?? { type: 'off' }
   return config.background ?? { type: 'off' }
 }
@@ -471,6 +482,33 @@ function onSimRelease() {
 /** Abort any in-flight press without firing — mode toggles and config swaps call this. */
 function cancelPress() {
   if (press) onSimRelease()
+}
+
+/**
+ * The colour a held pad shows right now, or null if nothing is being held.
+ *
+ * MIRRORS launchpad/holdfeedback.py: RED -> YELLOW -> GREEN_BRIGHT at 0%, 50%, 90%.
+ * The final stage is deliberately narrow. It was an even third, and on hardware a
+ * 2000 ms hold went bright at 1333 ms and got released at 1484 ms -- "i thought it
+ * fired". Bright must mean NOW, not DONE.
+ *
+ * Only the eight palette indices verified on real hardware are usable, and three of
+ * them are greens; a green ramp was the first attempt and is worse, because GREEN is
+ * the Set Browser's own idle colour and the hold would appear to snap back to idle
+ * halfway through.
+ */
+const HOLD_RAMP = [
+  { at: 0.0, palette: 5 },  // RED          "not yet"
+  { at: 0.5, palette: 13 }, // YELLOW       "nearly"
+  { at: 0.9, palette: 21 }, // GREEN_BRIGHT "now"
+]
+
+function holdRampSpec() {
+  if (!press || !(press.holdMs > 0) || press.fired) return null
+  const progress = (performance.now() - press.startedAt) / press.holdMs
+  let stage = HOLD_RAMP[0]
+  for (const step of HOLD_RAMP) if (progress >= step.at) stage = step
+  return { type: 'static', palette: stage.palette }
 }
 
 function advanceHold(now) {

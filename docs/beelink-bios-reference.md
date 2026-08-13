@@ -75,8 +75,26 @@ If disabling the whole stack is not offered, disable **IPv4 PXE Support** and
 
 Skips parts of hardware enumeration on a machine whose hardware has not changed.
 
-If a sub-option **MRC Fast Boot** (memory reference code) is offered, enable it too —
-it skips full memory retraining on every boot, which alone can be several seconds.
+No **MRC Fast Boot** on this board — it is Intel-platform-specific and not offered
+here. OBSERVED 2026-08-13, the Fast Boot submenu on this machine instead contains:
+
+| Setting | As found | Do | Why |
+|---|---|---|---|
+| USB Support | Full Initial | → **Partial Initial** | Biggest win here. Full Initial enumerates every USB device during POST; the Launchpad, EVO and hubs do not need BIOS to see them, Windows enumerates them itself. **But see the catch below.** |
+| UFS Support | Enabled | → **Disabled** | Universal Flash Storage. This machine has none, so it is probing for a device class that is not there. |
+| PS2 Devices Support | Enabled | → **Disabled** | A mini PC with no PS/2 ports. |
+| NVMe Support | Enabled | **leave** | The boot drive. Disabling it is how the machine stops booting. |
+| VGA Support | EFI driver | leave | Needed for display, no meaningful time in it. |
+| Network Stack Driver Support | Disabled | already right | — |
+| Redirection Support | Disabled | already right | serial console redirection |
+
+**The USB catch, decided deliberately rather than discovered:** with *Partial Initial*
+some firmware does not bring up a USB keyboard during POST, so **DEL stops reaching
+Setup**. Recoverable through Windows → Advanced startup → UEFI Firmware Settings —
+confirm that route works BEFORE relying on it.
+
+The cautious order is UFS and PS2 first, which are free and cannot bite, then USB
+separately so you know which one cost you the keyboard if it does.
 
 **Known cost:** with Fast Boot on, some firmware stops polling USB early enough that
 DEL no longer gets you into Setup. If that happens, get back in via Windows:

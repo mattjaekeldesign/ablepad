@@ -69,6 +69,24 @@ class AbletonLauncher:
             reasons.append("audio interface not present (see docs/audient-evo-8-reference.md §6)")
         return reasons
 
+    def adopt(self, pid: int) -> ProcessHandle:
+        """
+        Take ownership of an Ableton that was already running.
+
+        Needed because the controller can start while Live is up -- a Task Scheduler
+        retry, or the controller crashing on its own. Without this, launch() sees no
+        handle, starts a SECOND Live, and the two fight over the interface's single
+        ASIO device. OBSERVED 2026-08-13: the newcomer lost, the rig went to ERROR,
+        and a perfectly healthy set carried on playing underneath.
+
+        Adopting means stop() and is_running() work on it exactly as if we had
+        started it. What it does NOT tell us is which set the process has open --
+        that is not recoverable from the process, and callers must not assume.
+        """
+        self._handle = ProcessHandle(pid=pid, exe=str(self.exe))
+        log.info("adopted running Ableton (pid %d)", pid)
+        return self._handle
+
     def launch(self, live_set: Path) -> ProcessHandle:
         if self._handle is not None and self.processes.is_running(self._handle):
             raise LaunchRefused(["Ableton is already running — stop it first, one owner only"])

@@ -236,3 +236,72 @@ def test_a_refused_launch_does_not_sweep(tmp_path):
             recovery=Sweep(ableton_appdata=tmp_path / "a", quarantine=tmp_path / "q"),
         ).launch(als)
     assert swept == []
+
+
+# --- adoption ------------------------------------------------------------
+
+
+def test_adopting_lets_stop_and_is_running_work_on_a_process_we_did_not_start(tmp_path):
+    # The guard against a second Ableton. Two instances fight over one ASIO device
+    # and the loser looks like broken hardware.
+    from ableton.launcher import AbletonLauncher
+
+    stopped = []
+
+    class Controller:
+        def start(self, exe, argument):
+            raise AssertionError("must not start a second instance")
+
+        def is_running(self, handle):
+            return True
+
+        def terminate_gracefully(self, handle, timeout_s):
+            stopped.append(handle.pid)
+            return True
+
+        def kill(self, handle):
+            pass
+
+    class Present:
+        def is_present(self):
+            return True
+
+    exe = tmp_path / "Live.exe"
+    exe.write_text("")
+    launcher = AbletonLauncher(exe=exe, processes=Controller(), audio=Present())
+
+    assert not launcher.is_running()
+    launcher.adopt(4321)
+    assert launcher.is_running()
+    launcher.stop()
+    assert stopped == [4321]
+
+
+def test_launching_while_one_is_adopted_is_refused(tmp_path):
+    from ableton.launcher import AbletonLauncher, LaunchRefused
+
+    class Controller:
+        def start(self, exe, argument):
+            raise AssertionError("must not start a second instance")
+
+        def is_running(self, handle):
+            return True
+
+        def terminate_gracefully(self, handle, timeout_s):
+            return True
+
+        def kill(self, handle):
+            pass
+
+    class Present:
+        def is_present(self):
+            return True
+
+    exe = tmp_path / "Live.exe"
+    exe.write_text("")
+    als = tmp_path / "set.als"
+    als.write_text("")
+    launcher = AbletonLauncher(exe=exe, processes=Controller(), audio=Present())
+    launcher.adopt(4321)
+    with pytest.raises(LaunchRefused):
+        launcher.launch(als)

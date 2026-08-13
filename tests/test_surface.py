@@ -9,6 +9,7 @@ rig off, because a foot brushed a pad between numbers.
 from pathlib import Path
 
 from launchpad import colors, grid
+from launchpad.holdfeedback import HOLD_RAMP
 from launchpad.mappings import Action, ModeConfig, PadBinding, ConfigLibrary, load_library
 from launchpad.service import LaunchpadService
 from launchpad.surface import Surface
@@ -174,7 +175,11 @@ def test_a_mode_change_abandons_a_hold_in_progress():
 # --- held pads are visible ----------------------------------------------
 
 
-def test_a_held_pad_renders_as_pressed():
+def test_a_held_pad_shows_hold_progress_not_its_pressed_colour():
+    # Supersedes an earlier assertion that a held pad paints its config `pressed`
+    # colour. Same intent -- the player must see the hold happening -- but a flat
+    # colour cannot say HOW FAR ALONG the hold is, and that is the information a
+    # 2000 ms hold actually needs to convey. See launchpad/holdfeedback.py.
     pads = {11: PadBinding(
         pad=11, label="", action=Action("LOAD_SET", {}, 2000),
         led={"idle": {"type": "static", "palette": colors.GREEN},
@@ -185,7 +190,39 @@ def test_a_held_pad_renders_as_pressed():
     surface.tick(now_ms=0)
     surface.tick(now_ms=100)
     painted = {s.index: s for s in service.painted[-1]}
-    assert painted[11].colour == colors.RED, "the player must see the hold happening"
+    assert painted[11].colour == HOLD_RAMP[0]
+    assert painted[11].colour != colors.GREEN, "must differ from idle, or nothing happened"
+
+
+def test_the_held_pad_climbs_the_ramp_as_the_hold_progresses():
+    pads = {11: PadBinding(
+        pad=11, label="", action=Action("LOAD_SET", {}, 3000),
+        led={"idle": {"type": "static", "palette": colors.GREEN}},
+    )}
+    surface, service, _ = build(pads)
+    service.pending = [PadEvent(note=11, velocity=90, pressed=True)]
+    surface.tick(now_ms=0)
+    seen = []
+    for now in (100, 1500, 2900):
+        surface.tick(now_ms=now)
+        seen.append({s.index: s for s in service.painted[-1]}[11].colour)
+    assert seen == list(HOLD_RAMP), "a 6 s shutdown hold must not look static"
+
+
+def test_releasing_a_hold_returns_the_pad_to_normal():
+    pads = {11: PadBinding(
+        pad=11, label="", action=Action("LOAD_SET", {}, 2000),
+        led={"idle": {"type": "static", "palette": colors.GREEN}},
+    )}
+    surface, service, _ = build(pads)
+    service.pending = [PadEvent(note=11, velocity=90, pressed=True)]
+    surface.tick(now_ms=0)
+    surface.tick(now_ms=100)
+    service.pending = [PadEvent(note=11, velocity=0, pressed=False)]
+    surface.tick(now_ms=200)
+    surface.tick(now_ms=300)
+    painted = {s.index: s for s in service.painted[-1]}
+    assert painted[11].colour == colors.GREEN, "an abandoned hold must stop looking armed"
 
 
 # --- against the real configs -------------------------------------------

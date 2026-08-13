@@ -38,6 +38,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Callable
 
+from launchpad.holdfeedback import hold_leds
 from launchpad.mappings import ConfigLibrary, ModeConfig
 from launchpad.modes import resolve
 from launchpad.player import AnimationPlayer, PlayMode
@@ -105,7 +106,14 @@ class Surface:
             except Exception:  # noqa: BLE001 -- a bad override must not blank the surface
                 log.exception("override provider for %s failed — painting without it", config.id)
         specs = render(
-            config, overlay=overlay, pressed=frozenset(self._pressed), overrides=overrides
+            config,
+            overlay=overlay,
+            pressed=frozenset(self._pressed),
+            overrides=overrides,
+            # Computed here rather than inside render() because the holds are this
+            # object's state and the renderer is pure. One tick of lag: a press is
+            # read after this call, so its first ramp frame lands 33 ms later.
+            holds=hold_leds(self._held, now_ms),
         )
 
         for event in self.service.tick(now_ms / 1000.0, specs):

@@ -146,6 +146,34 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
             return
         launch_state["tried"] = True
         boot_set = Path(config.ableton.boot_set)
+
+        # ADOPT an Ableton that is already up rather than starting a second one.
+        # OBSERVED 2026-08-13: restarting the controller with Live running launched a
+        # duplicate, the two fought over the EVO's single ASIO device, the newcomer
+        # lost and the rig went to ERROR with a perfectly healthy set still playing.
+        #
+        # This is not a rare state. The controller restarting under a live Ableton is
+        # exactly what a Task Scheduler retry, or a crash of the controller alone,
+        # produces -- and the boot gate cannot catch it, because the EXISTING
+        # instance makes ableton_audio and settled pass instantly.
+        existing = _running_ableton()
+        if existing is not None:
+            supervisor.launcher.adopt(existing)
+            # Supervise it, with boot_set as the RECOVERY target. Which set an
+            # adopted process has open is not knowable from the process, so a crash
+            # restarts the known-good set rather than guessing. Deliberately NOT
+            # marked as loaded in the browser: an unnecessary reload is harmless,
+            # while a wrong no-op would leave a pad that silently does nothing.
+            supervisor.watch(boot_set)
+            log.warning(
+                "Ableton was already running (pid %d) — adopted it instead of "
+                "launching a second instance. Only one process can own the EVO's "
+                "ASIO device; the loser of that fight looks like broken hardware. "
+                "The set it has open is unknown, so a crash will recover to %s.",
+                existing, boot_set.name,
+            )
+            return
+
         try:
             supervisor.launcher.launch(boot_set)
             supervisor.watch(boot_set)
@@ -189,6 +217,25 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         ],
     )
     return controller, surface
+
+
+
+def _running_ableton() -> int | None:
+    """
+    PID of an Ableton that is already up, or None. Never raises.
+
+    Lives here rather than in ableton/ because it is a platform probe, and the
+    ableton/ layer is deliberately free of Windows imports so it stays testable
+    off-rig.
+    """
+    try:
+        from windows import probes  # noqa: PLC0415 — platform import, deliberate
+
+        proc = probes.process_running()
+    except Exception as exc:  # noqa: BLE001 — not on Windows, or psutil unhappy
+        log.debug("cannot check for a running Ableton (%s) — assuming none", exc)
+        return None
+    return proc.pid if proc is not None else None
 
 
 def build_ableton(config: RigConfig, bus: EventBus) -> AbletonSupervisor | None:

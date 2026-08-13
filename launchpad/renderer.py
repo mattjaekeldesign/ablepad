@@ -96,16 +96,26 @@ def _visible(
     overlay: Overlay | None,
     pressed: frozenset[int],
     overrides: dict[int, dict],
+    holds: dict[int, dict],
 ) -> dict:
     """The LED dict this pad should show, resolved through the stack. Still a dict."""
     binding = config.pads.get(index)
     override = overrides.get(index)
 
+    if overlay is not None and overlay.cover:
+        # An intro owns everything, including the pads it did not paint.
+        return overlay.frame.get(index) or OFF_SPEC
+
+    hold = holds.get(index)
+    if hold is not None:
+        # Outranks `pressed`, which is the point: a held pad's config styling is a
+        # single flat colour that says "you are touching this" and cannot say "and
+        # you are 60% of the way to loading a set". Below a covering intro only,
+        # because a mode change abandons holds anyway.
+        return hold
+
     if overlay is not None:
         spec = overlay.frame.get(index)
-        if overlay.cover:
-            # An intro owns everything, including the pads it did not paint.
-            return spec or OFF_SPEC
         if spec is not None and index not in pressed:
             # Pressed feedback beats ambient: the player needs to see their own press.
             # A pad carrying an override counts as bound -- it means something now,
@@ -130,6 +140,7 @@ def render(
     overlay: Overlay | None = None,
     pressed: frozenset[int] | set[int] | None = None,
     overrides: dict[int, dict] | None = None,
+    holds: dict[int, dict] | None = None,
 ) -> list[LedSpec]:
     """
     The whole surface for this instant: 81 LedSpecs, always, in a stable order.
@@ -144,9 +155,10 @@ def render(
     """
     held = frozenset(pressed or ())
     over = overrides or {}
+    holding = holds or {}
     if config is None:
         return [LedSpec(index=i, colour=colors.OFF) for i in grid.ALL_INDICES]
     return [
-        led_spec_from_dict(i, _visible(i, config, overlay, held, over))
+        led_spec_from_dict(i, _visible(i, config, overlay, held, over, holding))
         for i in grid.ALL_INDICES
     ]

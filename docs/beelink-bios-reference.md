@@ -21,8 +21,34 @@ recovery is a CMOS reset, which loses everything else too.
 - **DEL** repeatedly from power-on → Setup
 - **F7** → one-time boot menu (not what you want here)
 
-Navigation: arrows move, **+/-** change values, **F4** saves and exits, **ESC** backs
-out without saving.
+Navigation: arrows move, **+/-** change values, **ESC** backs out of a submenu.
+
+### Getting back out — nothing is permanent until F4
+
+| Key | Effect |
+|---|---|
+| **ESC** | leave a submenu without applying |
+| **F2** | **Previous Values** — undoes every change made since entering Setup. This is the undo. |
+| **F3** | Optimized Defaults — factory reset of EVERYTHING, including settings you meant to keep |
+| **ESC** at the top level | exit without saving; discards the whole session |
+| **F4** | save and exit — the only step that commits anything |
+
+So the safe loop is: change one thing, and if it looks wrong press **F2** or exit
+with **ESC**. Change one thing at a time and reboot between them, or a machine that
+will not POST leaves you guessing which setting did it.
+
+### If it will not POST at all
+
+Black screen, no Setup, no beep: clear CMOS. Unplug power, open the base, short the
+CLR_CMOS pads/jumper or pull the coin cell for ~60 s. That resets EVERYTHING to
+factory — which is why §1 says photograph the screens first.
+
+### If Setup itself becomes unreachable
+
+Fast Boot (§2.2) can shorten the POST past the point where **DEL** is polled. The
+way in from Windows: Settings → System → Recovery → **Advanced startup → Restart
+now** → Troubleshoot → Advanced options → **UEFI Firmware Settings**. This works
+however short the POST gets, and is worth trying ONCE before you need it.
 
 ---
 

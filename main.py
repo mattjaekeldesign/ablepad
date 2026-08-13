@@ -128,11 +128,16 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
 
     def on_released_pad(note: int, pressed: bool, now_ms: float) -> None:
         escape.feed(note, pressed, now_ms)
+
+    def on_released_tick(now_ms: float) -> None:
+        # Every tick, NOT only on input: a hold sends nothing between press and
+        # release, so checking on events alone means it can never complete.
         if escape.wants_surface(now_ms):
             ownership.take_back()
             escape.reset()
 
     surface.on_released_pad = on_released_pad
+    surface.on_released_tick = on_released_tick
     if not config.launchpad.handover_to_ableton:
         log.info("launchpad handover disabled — the rig keeps the surface at all times")
 
@@ -354,7 +359,19 @@ def build_ableton(config: RigConfig, bus: EventBus) -> AbletonSupervisor | None:
         stable_s=config.ableton.restart_stable_s,
         clock=time.monotonic,
     )
-    supervisor = AbletonSupervisor(launcher=launcher, budget=budget, bus=bus)
+    def left_crash_journal() -> bool:
+        """
+        Did Live leave a crash journal behind? Its own statement about how it ended.
+        Only consulted when exit_code() cannot answer -- i.e. for an adopted process.
+        """
+        return bool(recovery is not None and recovery.pending())
+
+    supervisor = AbletonSupervisor(
+        launcher=launcher,
+        budget=budget,
+        bus=bus,
+        left_crash_journal=left_crash_journal if recovery is not None else None,
+    )
 
     # A crash that exhausts the restart budget is the rig's problem, not the
     # supervisor's: it publishes and the controller decides. Error Mode, naming it.

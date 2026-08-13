@@ -94,6 +94,14 @@ class Surface:
     #: surface belongs to Ableton. The Custom layout's note map is nothing like
     #: Programmer Mode's, so these are NOT run through the mode configs.
     on_released_pad: "Callable[[int, bool, float], None] | None" = None
+    #: Called EVERY TICK while the surface belongs to Ableton, with now_ms.
+    #:
+    #: Separate from on_released_pad because a HOLD produces no events between press
+    #: and release. Evaluating it only on input means a 7-second hold is still
+    #: "in progress" at the moment the release clears it -- measured exactly that way
+    #: on the rig. This mirrors _expire_holds(), which is why owned-surface holds
+    #: always worked.
+    on_released_tick: "Callable[[float], None] | None" = None
 
     _last_state: RigState | None = field(default=None, init=False)
     _held: dict[int, Hold] = field(default_factory=dict, init=False)
@@ -140,11 +148,12 @@ class Surface:
         interpreting them against a ModeConfig would be wrong twice over -- the note
         map differs, and the rig is not showing any of those pads.
         """
-        if self.on_released_pad is None:
-            return
         try:
             for event in self.service.tick(now_ms / 1000.0, None):
-                self.on_released_pad(event.note, event.pressed, now_ms)
+                if self.on_released_pad is not None:
+                    self.on_released_pad(event.note, event.pressed, now_ms)
+            if self.on_released_tick is not None:
+                self.on_released_tick(now_ms)
         except Exception:  # noqa: BLE001 -- never break the loop over a lost escape
             log.exception("failed reading the released surface")
 

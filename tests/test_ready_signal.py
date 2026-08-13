@@ -169,3 +169,76 @@ def test_the_launcher_clears_the_signal_before_starting(tmp_path):
 
     assert order == ["clear", "start"], "a stale signal must not survive into a launch"
     assert not sig.path.exists()
+
+
+# --- how an ADOPTED Ableton ended ----------------------------------------
+
+
+def test_a_tidy_adopted_ableton_counts_as_a_clean_quit():
+    # exit_code() is None for an adopted process. Calling every such exit a crash
+    # relaunches sets people deliberately closed -- and adoption is the COMMON case
+    # whenever the controller restarts under a running Live.
+    from ableton.recovery import RestartBudget
+    from ableton.supervisor import AbletonSupervisor
+    from rig.events import AbletonClosed, AbletonCrashed, EventBus
+
+    seen = []
+
+    class Launcher:
+        class processes:
+            @staticmethod
+            def exit_code(handle):
+                return None
+
+        handle = object()
+
+        def is_running(self):
+            return False
+
+    bus = EventBus()
+    bus.subscribe(AbletonClosed, seen.append)
+    bus.subscribe(AbletonCrashed, seen.append)
+    sup = AbletonSupervisor(
+        launcher=Launcher(),
+        budget=RestartBudget(max_attempts=1, stable_s=1.0, clock=lambda: 0.0),
+        bus=bus,
+        left_crash_journal=lambda: False,  # Live tidied up = clean exit
+    )
+    sup.watch(Path("/sets/test.als"))
+    sup.poll()
+    assert [type(e).__name__ for e in seen] == ["AbletonClosed"]
+
+
+def test_an_adopted_ableton_that_left_a_journal_is_a_crash():
+    from ableton.recovery import RestartBudget
+    from ableton.supervisor import AbletonSupervisor
+    from rig.events import AbletonClosed, AbletonCrashed, EventBus
+
+    seen = []
+
+    class Launcher:
+        class processes:
+            @staticmethod
+            def exit_code(handle):
+                return None
+
+        handle = object()
+
+        def is_running(self):
+            return False
+
+        def launch(self, path):
+            pass
+
+    bus = EventBus()
+    bus.subscribe(AbletonClosed, seen.append)
+    bus.subscribe(AbletonCrashed, seen.append)
+    sup = AbletonSupervisor(
+        launcher=Launcher(),
+        budget=RestartBudget(max_attempts=1, stable_s=1.0, clock=lambda: 0.0),
+        bus=bus,
+        left_crash_journal=lambda: True,  # journal left behind = it died
+    )
+    sup.watch(Path("/sets/test.als"))
+    sup.poll()
+    assert "AbletonCrashed" in [type(e).__name__ for e in seen]

@@ -77,3 +77,12 @@ def test_loading_a_set_restores_normal_handover():
     owner.take_back()
     owner.release_override()
     assert owner.owner(RigState.PERFORMANCE, ableton_ready=True) == Owner.ABLETON
+
+
+def test_a_hold_completes_without_any_further_events(hatch):
+    # THE regression. A hold sends nothing between press and release, so a design
+    # that only evaluates on input never fires: measured on the rig as
+    # "escape gesture released after 7000 ms of 2000 - not taking the surface back".
+    hatch.feed(ESCAPE_NOTE, True, 0.0)
+    assert not hatch.wants_surface(1999.0)
+    assert hatch.wants_surface(2000.0), "must complete on a clock tick, not on input"

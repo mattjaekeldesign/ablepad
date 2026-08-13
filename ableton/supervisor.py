@@ -21,6 +21,8 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from typing import Callable
+
 from ableton.launcher import AbletonLauncher, LaunchRefused
 from ableton.recovery import RestartBudget
 from rig.events import (
@@ -39,6 +41,10 @@ class AbletonSupervisor:
     launcher: AbletonLauncher
     budget: RestartBudget
     bus: EventBus
+    #: Second opinion on how Live ended, for the case exit_code() cannot answer.
+    #: Returns True if Live left a crash journal behind. Optional: without it an
+    #: adopted Ableton's exit is simply unknowable, which is where this started.
+    left_crash_journal: "Callable[[], bool] | None" = None
 
     _watching: Path | None = field(default=None, init=False)
     _gave_up: bool = field(default=False, init=False)
@@ -64,6 +70,22 @@ class AbletonSupervisor:
             log.debug("no exit code available (%s) — treating as a crash", exc)
             return None
 
+    def _code_from_crash_journal(self) -> int | None:
+        """0 if Live tidied up after itself, 1 if it did not, None if we cannot tell."""
+        if self.left_crash_journal is None:
+            return None
+        try:
+            left_behind = bool(self.left_crash_journal())
+        except Exception as exc:  # noqa: BLE001
+            log.debug("cannot inspect the crash journal (%s)", exc)
+            return None
+        log.info(
+            "no exit code (adopted process); crash journal %s -> treating as %s",
+            "left behind" if left_behind else "cleaned up",
+            "a crash" if left_behind else "a clean exit",
+        )
+        return 1 if left_behind else 0
+
     def poll(self) -> None:
         if self._watching is None or self._gave_up:
             return
@@ -82,6 +104,18 @@ class AbletonSupervisor:
         # is treated as a crash: assuming "clean" would make every real crash
         # silently unrecoverable, which is the more expensive way to be wrong.
         code = self._exit_code()
+        if code is None:
+            # An ADOPTED Ableton has no Popen behind it. Rather than call every such
+            # exit a crash -- which relaunches sets people deliberately closed, and
+            # adoption is the COMMON case whenever the controller restarts under a
+            # running Live -- ask the filesystem.
+            #
+            # MEASURED 2026-08-13: Live writes Preferences\Crash\<stamp>_* at
+            # startup and REMOVES it on a clean exit. A journal left behind is
+            # exactly the thing that makes Live offer to recover, so its presence is
+            # a direct, first-hand statement by Live about how it ended.
+            code = self._code_from_crash_journal()
+
         if code == 0:
             log.info("Ableton closed cleanly (was playing %s)", live_set.name)
             self._watching = None

@@ -1,0 +1,40 @@
+# Boot gate — first hardware run, 2026-08-13, Beelink RIG
+# Ableton deliberately CLOSED, so the gate should refuse to complete and say why.
+
+RESULT: correct on every count.
+
+  boot gate started: 5 check(s), 90s deadline
+  FAIL launchpad      not connected -- no surface, no UI      (device not yet open)
+  ---- evo8           absent from the failure list = PASSED
+  FAIL ableton        process not running
+  FAIL ableton_audio  not bound to the EVO -- wrong audio device selected?
+  FAIL settled        still settling
+  ...
+  launchpad connected (connect #1)
+  boot check now passing: launchpad -- connected
+
+  Boot did NOT complete. State stayed BOOT. Rig kept running.
+
+# --- what this establishes ---
+#
+# The EVO probe works on real hardware. Reading
+#   HKLM\SYSTEM\CurrentControlSet\Services\audientusbaudio\Enum
+# found VID_2708&PID_0007 bound, in 0.03 ms. That is the check running every tick
+# with no measurable cost, versus ~1 s for Get-PnpDevice.
+#
+# A check that starts failing and later passes is reported both ways. The launchpad
+# check failed at gate start (the service had not opened the device yet) and logged
+# "now passing" when it did. Boot conditions that arrive late are not punished for
+# being slow -- which matters, because USB enumeration order at cold boot is exactly
+# the kind of thing that is slow and out of our control.
+#
+# Each distinct failure is logged ONCE, not once per tick. At 30 Hz over a 90 s
+# deadline the naive version would write 13,500 lines before giving up.
+
+# --- what is NOT yet established ---
+#   * that all five pass together and the gate transitions BOOT -> SET_BROWSER.
+#     Needs Ableton running and bound to the EVO.
+#   * that the EVO probe goes FALSE when the interface is unplugged. The registry
+#     key is documented to behave that way and read correctly while attached, but
+#     nobody has watched Count drop to zero. Flagged in windows/probes.py.
+#   * the FAILED path: gate expiring at 90 s and driving the rig into Error Mode.

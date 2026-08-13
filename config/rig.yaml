@@ -10,8 +10,11 @@
 
 rig:
   name: liverig
-  tick_hz: 30            # matches the Lab's animation frame rate; hardware feasibility
-                         # of 30 fps SysEx streaming is UNVERIFIED (Phase 1, led_batch_tester)
+  tick_hz: 30            # MEASURED 2026-08-12: 899 consecutive ticks, zero overruns,
+                         # each one rendering and pushing all 81 LEDs on the Beelink
+  boot_timeout_s: 90     # how long the boot gate waits before showing Error Mode
+  boot_settle_s: 25      # UNVERIFIED guess at how long Ableton takes to load a set.
+                         # Measure with the real set and a stopwatch, then set it.
 
 launchpad:
   brightness: 40         # UNVERIFIED sane-guess. Manual p.5: low brightness may be

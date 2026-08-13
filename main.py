@@ -23,16 +23,19 @@ import sys
 import time
 from pathlib import Path
 
+from ableton.readiness import Readiness, ReadinessTracker
 from launchpad.backend_mido import MidoBackend
 from launchpad.mappings import load_library
 from launchpad.modes import missing_configs
 from launchpad.service import LaunchpadService
 from launchpad.surface import Surface
+from rig.boot import BootGate, BootOutcome
+from rig.boot_checks import build_checks
 from rig.commands import CommandDispatcher
 from rig.controller import RigController
 from rig.events import ActionRequested, EventBus
 from rig.exceptions import ConfigError
-from rig.state import StateMachine
+from rig.state import RigState, StateMachine
 from storage.config_loader import RigConfig, load_config
 
 log = logging.getLogger("main")
@@ -89,15 +92,92 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         lambda e: log.info("ACTION %s from pad %d params=%s", e.action, e.pad, e.params),
     )
 
+    gate = build_boot_gate(config, service, machine)
+
+    def boot_tick() -> None:
+        """
+        Drive the gate while, and only while, the rig is on the splash screen.
+
+        BOOT is the one state with an automatic exit. Everything else moves because
+        a human pressed something.
+        """
+        if machine.state is not RigState.BOOT:
+            return
+        outcome = gate.evaluate()
+        if outcome is BootOutcome.COMPLETE:
+            machine.transition(RigState.SET_BROWSER, "BOOT_COMPLETE")
+        elif outcome is BootOutcome.FAILED:
+            # Error Mode, naming the fault. On a screenless rig "EVO 8 not on the USB
+            # bus" and "Ableton not running" need different hands doing different
+            # things, and a plain red screen tells you neither.
+            machine.transition(RigState.ERROR, gate.summary())
+
     controller = RigController(
         machine=machine,
         bus=bus,
         tick_hz=config.rig.tick_hz,
         clock=time.monotonic,
         sleep=time.sleep,
-        on_tick=[lambda: surface.tick(time.monotonic() * 1000.0)],
+        on_tick=[boot_tick, lambda: surface.tick(time.monotonic() * 1000.0)],
     )
     return controller, surface
+
+
+def build_boot_gate(config: RigConfig, service: LaunchpadService, machine: StateMachine) -> BootGate:
+    """
+    Assemble the real probes, or degrade honestly if we are not on the target.
+
+    On anything but Windows the platform probes cannot run. Rather than pretending
+    they pass — which would let a Mac "boot complete" into a rig that does not exist
+    — the unavailable ones report False and the gate simply never completes. The log
+    says why once, and the rest of the stack stays exercisable.
+    """
+    try:
+        from windows import probes  # noqa: PLC0415 — platform import, deliberate
+    except Exception as exc:  # noqa: BLE001
+        log.warning("platform probes unavailable (%s) — boot cannot complete here", exc)
+        probes = None
+
+    if probes is None:
+        false = lambda: False  # noqa: E731
+        checks = build_checks(
+            launchpad_connected=lambda: service.connected,
+            evo_present=false, ableton_running=false,
+            ableton_bound_to_evo=false, ableton_settled=false,
+        )
+    else:
+        # memory_maps() costs ~13 ms; at 30 Hz that is 38% of the tick budget, so it
+        # is cached. The registry probes are 0.03 ms and run uncached.
+        ableton_proc = probes.cached(lambda: probes.process_running(), ttl_s=1.0)
+        bound = probes.cached(
+            lambda: (p := ableton_proc()) is not None
+            and probes.process_has_module(p, probes.AUDIENT_ASIO_MODULE),
+            ttl_s=2.0,
+        )
+        readiness = ReadinessTracker(settle_s=config.rig.boot_settle_s, clock=time.monotonic)
+        started = {"seen": False}
+
+        def settled() -> bool:
+            if ableton_proc() is None:
+                started["seen"] = False
+                readiness.mark_gone()
+                return False
+            if not started["seen"]:
+                started["seen"] = True
+                readiness.mark_started()
+            return readiness.state(process_running=True) in (
+                Readiness.ASSUMED_READY, Readiness.CONFIRMED_READY,
+            )
+
+        checks = build_checks(
+            launchpad_connected=lambda: service.connected,
+            evo_present=lambda: probes.usb_device_bound(),
+            ableton_running=lambda: ableton_proc() is not None,
+            ableton_bound_to_evo=lambda: bool(bound()),
+            ableton_settled=settled,
+        )
+
+    return BootGate(checks=checks, timeout_s=config.rig.boot_timeout_s, clock=time.monotonic)
 
 
 def main(argv: list[str] | None = None) -> int:

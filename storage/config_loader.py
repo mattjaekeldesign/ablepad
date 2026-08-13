@@ -32,6 +32,14 @@ from rig.exceptions import ConfigError
 class RigSection:
     name: str
     tick_hz: int
+    #: How long the boot gate waits for every precondition before giving up and
+    #: showing Error Mode. A rig stuck on the splash screen forever is
+    #: indistinguishable, on a screenless machine, from one that has crashed.
+    boot_timeout_s: float = 90.0
+    #: How long after Ableton's process appears we ASSUME its set finished loading.
+    #: A guess -- see ableton/readiness.py. Measure it on the Beelink with the real
+    #: set and a stopwatch, then put the measured value here.
+    boot_settle_s: float = 25.0
 
 
 @dataclass(frozen=True)
@@ -105,6 +113,9 @@ def load_config(path: Path) -> RigConfig:
     rig_raw = section("rig")
     name = want(rig_raw, "rig", "name", str)
     tick_hz = want(rig_raw, "rig", "tick_hz", int)
+    # Optional: sane defaults so a config written before the boot gate still loads.
+    boot_timeout_s = rig_raw.get("boot_timeout_s", 90.0)
+    boot_settle_s = rig_raw.get("boot_settle_s", 25.0)
     if isinstance(tick_hz, int) and not 1 <= tick_hz <= 200:
         problems.append(f"rig.tick_hz must be 1-200, got {tick_hz}")
 
@@ -137,7 +148,10 @@ def load_config(path: Path) -> RigConfig:
         raise ConfigError(problems)
 
     return RigConfig(
-        rig=RigSection(name=str(name), tick_hz=int(tick_hz)),  # type: ignore[arg-type]
+        rig=RigSection(
+            name=str(name), tick_hz=int(tick_hz),
+            boot_timeout_s=float(boot_timeout_s), boot_settle_s=float(boot_settle_s),
+        ),  # type: ignore[arg-type]
         launchpad=LaunchpadSection(
             brightness=int(brightness), port_contains=str(port_contains)  # type: ignore[arg-type]
         ),

@@ -39,7 +39,7 @@ from typing import Mapping, Protocol
 
 from launchpad import colors
 
-__all__ = ["HOLD_RAMP", "hold_leds", "Held"]
+__all__ = ["HOLD_RAMP", "HOLD_THRESHOLDS", "hold_leds", "Held"]
 
 
 #: "not yet" -> "nearly" -> "about to fire". Every entry MUST be in colors.VERIFIED:
@@ -58,6 +58,21 @@ __all__ = ["HOLD_RAMP", "hold_leds", "Held"]
 #:     RED -- but a collision on ONE stage of three still leaves visible movement,
 #:     where a collision in the middle of a monochrome ramp reads as a glitch.
 HOLD_RAMP: tuple[int, ...] = (colors.RED, colors.YELLOW, colors.GREEN_BRIGHT)
+
+#: Progress at which each ramp stage BEGINS. Not equal thirds, and that is the whole
+#: point of this tuple.
+#:
+#: OBSERVED 2026-08-13: with equal thirds, a 2000 ms LOAD_SET reached its final
+#: colour at 1333 ms and was released at 1484 ms -- "i thought it fired". The last
+#: stage had a 667 ms dwell, which is long enough to read as a completed action
+#: rather than an imminent one, and letting go there cancels the very thing the
+#: feedback was encouraging.
+#:
+#: So the final stage is now the last 10%: 200 ms on a LOAD_SET, 600 ms on a 6000 ms
+#: SYSTEM_SHUTDOWN. Short enough that "bright green" means NOW rather than DONE, long
+#: enough to be several frames at 30 Hz. The long first stage is not wasted -- it is
+#: the one that answers "is this pad even responding".
+HOLD_THRESHOLDS: tuple[float, ...] = (0.0, 0.5, 0.9)
 
 
 class Held(Protocol):
@@ -78,14 +93,35 @@ def stage(progress: float) -> int:
     """
     Which ramp colour a 0.0-1.0 progress lands on.
 
-    Clamped at both ends. Progress can exceed 1.0 for the tick between a hold
-    completing and the surface firing it, and an IndexError there would black out
-    the whole surface at the instant the user finally succeeded.
+    The last threshold that progress has reached. Clamped at both ends: progress can
+    exceed 1.0 for the tick between a hold completing and the surface firing it, and
+    an IndexError there would black out the whole surface at the instant the user
+    finally succeeded.
     """
-    if progress <= 0.0:
-        return 0
-    index = int(progress * len(HOLD_RAMP))
+    index = 0
+    for i, threshold in enumerate(HOLD_THRESHOLDS):
+        if progress >= threshold:
+            index = i
     return min(index, len(HOLD_RAMP) - 1)
+
+
+def sanity_check() -> None:
+    """
+    The two tuples are a single table written as two. Catch drift at import, not on
+    stage -- a mismatch means either a colour nobody can reach or an IndexError.
+    """
+    assert len(HOLD_THRESHOLDS) == len(HOLD_RAMP), (
+        f"{len(HOLD_THRESHOLDS)} thresholds for {len(HOLD_RAMP)} colours"
+    )
+    assert HOLD_THRESHOLDS[0] == 0.0, "the first stage must cover a just-started hold"
+    assert list(HOLD_THRESHOLDS) == sorted(HOLD_THRESHOLDS), "thresholds must ascend"
+    assert all(colors.is_verified(c) for c in HOLD_RAMP), (
+        "hold feedback exists to be seen; every stage must be a colour confirmed on "
+        "hardware (colors.VERIFIED)"
+    )
+
+
+sanity_check()
 
 
 def hold_leds(holds: Mapping[int, Held], now_ms: float) -> dict[int, dict]:

@@ -80,6 +80,27 @@ class SurfaceOwner:
     enabled: bool = True
 
     _last: str | None = field(default=None, init=False)
+    #: Set by the escape gesture: the performer asked for the launcher back while
+    #: Ableton was still running. Outranks the table below, and is cleared the
+    #: moment a set is loaded again -- otherwise the rig would keep the surface
+    #: through the next performance.
+    _taken_back: bool = field(default=False, init=False)
+
+    def take_back(self) -> None:
+        """The performer asked for the launcher. Overrides handover until a load."""
+        if not self._taken_back:
+            log.info("surface taken back by request — Ableton keeps playing")
+        self._taken_back = True
+
+    def release_override(self) -> None:
+        """A set is loading; normal handover rules apply again."""
+        if self._taken_back:
+            log.info("handover override cleared")
+        self._taken_back = False
+
+    @property
+    def taken_back(self) -> bool:
+        return self._taken_back
 
     def owner(self, state: RigState, ableton_ready: bool) -> str:
         """
@@ -103,6 +124,10 @@ class SurfaceOwner:
 
     def _decide(self, state: RigState, ableton_ready: bool) -> str:
         if not self.enabled:
+            return Owner.RIG
+        if self._taken_back:
+            # Asked for explicitly. Ableton carries on playing underneath -- this
+            # takes the SURFACE, not the audio.
             return Owner.RIG
         if not _HANDS_OVER.get(state, False):
             return Owner.RIG

@@ -284,6 +284,44 @@ class LaunchpadDevice:
         log.info("programmer mode entered, device settings asserted")
         return self.identity
 
+    def hand_over(self) -> None:
+        """
+        Blank the surface and return the device to Live Mode WITHOUT closing.
+
+        For handing the Launchpad to Ableton while keeping the input port open, so
+        the rig can still hear the escape gesture that takes it back
+        (rig/escape_hatch.py). Closing would work too and would be deaf.
+
+        Blanking first matters: Live's script paints what it wants to paint, and
+        whatever the rig left lit would otherwise sit there underneath until Live
+        happened to overwrite that pad.
+        """
+        try:
+            self.clear()
+            self._send(CMD_PROGRAMMER_LIVE, 0)  # p.7 — back to Live Mode
+            log.info("handed the surface to Live Mode (input stays open)")
+        except Exception as exc:  # noqa: BLE001 -- a failed handover must not raise
+            log.warning("could not hand over cleanly: %s", exc)
+
+    def reassert(self) -> None:
+        """
+        Take the surface back: Programmer Mode and every device setting, again.
+
+        Ableton has been driving the device into DAW mode and its own layout, so
+        NOTHING about its state can be assumed -- velocity curve, aftertouch, LED
+        feedback and brightness are all Live's now. This re-runs the same sequence
+        connect() does, which is why it is worth having in one place.
+        """
+        self._send(CMD_PROGRAMMER_LIVE, 1)
+        time.sleep(self.settle_s)
+        self._send(CMD_LED_FEEDBACK, 1, 1)
+        self._send(CMD_VELOCITY_CURVE, 3, 127)
+        self._send(CMD_AFTERTOUCH, 2, 1)
+        self._send(CMD_LED_SLEEP, 1)
+        self._send(CMD_BRIGHTNESS, max(0, min(127, self.brightness)))
+        self.clear()
+        log.info("programmer mode re-asserted after Ableton had the surface")
+
     def close(self, restore: bool = True) -> None:
         """
         Let go of the device. Idempotent — safe from a finally block and an atexit

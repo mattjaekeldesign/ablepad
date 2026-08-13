@@ -90,6 +90,10 @@ class Surface:
     #: belongs to Ableton. Injected rather than computed here: the surface knows
     #: about pads and modes, not about whether a DAW is running.
     rig_owns_surface: "Callable[[], bool]" = field(default=lambda: True)
+    #: Called with (note, pressed, now_ms) for raw pad traffic arriving while the
+    #: surface belongs to Ableton. The Custom layout's note map is nothing like
+    #: Programmer Mode's, so these are NOT run through the mode configs.
+    on_released_pad: "Callable[[int, bool, float], None] | None" = None
 
     _last_state: RigState | None = field(default=None, init=False)
     _held: dict[int, Hold] = field(default_factory=dict, init=False)
@@ -100,6 +104,7 @@ class Surface:
     def tick(self, now_ms: float) -> None:
         """One frame. Never raises: the service swallows device faults already."""
         if not self._own_surface():
+            self._listen_while_released(now_ms)
             return
         config = self._config_for_current_state()
         self._arm_on_state_change(config, now_ms)
@@ -126,6 +131,22 @@ class Surface:
             self._on_pad(event, config, now_ms)
 
         self._expire_holds(now_ms)
+
+    def _listen_while_released(self, now_ms: float) -> None:
+        """
+        Read the device without painting it, so the escape gesture can be heard.
+
+        The service returns raw events in this state. They are handed straight out;
+        interpreting them against a ModeConfig would be wrong twice over -- the note
+        map differs, and the rig is not showing any of those pads.
+        """
+        if self.on_released_pad is None:
+            return
+        try:
+            for event in self.service.tick(now_ms / 1000.0, None):
+                self.on_released_pad(event.note, event.pressed, now_ms)
+        except Exception:  # noqa: BLE001 -- never break the loop over a lost escape
+            log.exception("failed reading the released surface")
 
     def _own_surface(self) -> bool:
         """

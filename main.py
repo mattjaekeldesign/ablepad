@@ -41,6 +41,7 @@ from rig.boot_checks import build_checks
 from rig.commands import CommandDispatcher
 from rig.controller import RigController
 from rig.mode_switch import ModeSwitch
+from rig.escape_hatch import EscapeHatch
 from rig.surface_owner import SurfaceOwner
 from rig.events import AbletonClosed, AbletonGaveUp, ActionRequested, EventBus
 from rig.exceptions import ConfigError
@@ -119,6 +120,19 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         return supervisor is not None and supervisor.launcher.is_running()
 
     surface.rig_owns_surface = lambda: ownership.rig_owns(machine.state, ableton_ready())
+
+    # The way back to the launcher without quitting Live. MEASURED: with Live
+    # driving interface 1, the Launchpad's CUSTOM layout sends pads to interface 2,
+    # which the rig keeps open while released. Hold the top-left pad for 2 s.
+    escape = EscapeHatch()
+
+    def on_released_pad(note: int, pressed: bool, now_ms: float) -> None:
+        escape.feed(note, pressed, now_ms)
+        if escape.wants_surface(now_ms):
+            ownership.take_back()
+            escape.reset()
+
+    surface.on_released_pad = on_released_pad
     if not config.launchpad.handover_to_ableton:
         log.info("launchpad handover disabled — the rig keeps the surface at all times")
 
@@ -131,11 +145,21 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         told those apart by exit code.
         """
         log.info("Ableton closed (%s) — taking the launchpad back", event.set_name)
+        ownership.release_override()  # normal rules again; nothing is playing now
+        escape.reset()
         browser_control.forget_loaded()
         if machine.state is not RigState.SET_BROWSER:
             machine.transition(RigState.SET_BROWSER, f"ABLETON_CLOSED {event.set_name}")
 
     bus.subscribe(AbletonClosed, on_ableton_closed)
+
+    def on_load_requested(event: ActionRequested) -> None:
+        """A set is loading, so hand the surface back to Ableton once it is up."""
+        if event.action == "LOAD_SET":
+            ownership.release_override()
+            escape.reset()
+
+    bus.subscribe(ActionRequested, on_load_requested)
 
     # Makes every config's SWITCH_MODE pad real. Without it the 'Browse' pad in
     # Performance mode arms, fires, and nothing happens -- the Set Browser exists but

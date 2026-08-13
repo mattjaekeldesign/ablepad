@@ -70,6 +70,11 @@ Expected saving: often most of a 15–20 s POST.
 If disabling the whole stack is not offered, disable **IPv4 PXE Support** and
 **IPv6 PXE Support** individually.
 
+**Do not confuse this with `Network Stack Driver Support` in the Fast Boot submenu
+(§2.2).** That one only governs what Fast Boot skips; this one governs whether the
+stack is brought up at all. Seeing the Fast Boot entry already Disabled says nothing
+about this setting, and it is this one that costs the POST time.
+
 ### 2.2 Fast Boot → **Enabled**
 
 `Boot → Fast Boot`
@@ -97,23 +102,28 @@ confirm that route works BEFORE relying on it.
 The cautious order is UFS and PS2 first, which are free and cannot bite, then USB
 separately so you know which one cost you the keyboard if it does.
 
-### 2.3 CSM → **Disabled**
+### 2.3 CSM — nothing to do on this machine
 
-`Boot → CSM Configuration → CSM Support`
+OBSERVED 2026-08-13: there is no CSM Configuration menu. That is not a missing
+setting, it is a better state — the firmware is UEFI-only, so there is no legacy
+compatibility module and no option-ROM scanning to switch off.
 
-Legacy BIOS compatibility. Windows here is UEFI, so CSM only adds legacy option ROM
-scanning. Often already disabled.
-
-**Do not change this if you are unsure the install is UEFI.** Check first, in Windows:
-`msinfo32` → **BIOS Mode** should read *UEFI*. If it says *Legacy*, leave CSM alone —
-disabling it makes the machine unbootable.
+Left here because its absence is the answer, and someone will otherwise go looking
+for it again.
 
 ### 2.4 Boot order → SSD only
 
-`Boot → Boot Option Priorities`
+OBSERVED 2026-08-13: this firmware splits boot order into two submenus rather than
+one list.
 
-Put the Windows Boot Manager / NVMe SSD first and set every other entry to
-**Disabled**. Each enabled device is something the firmware probes and waits on.
+| Menu | What it orders | Do |
+|---|---|---|
+| **UEFI Hard Disk Drive BBS Priorities** | among the drives themselves | NVMe SSD first |
+| **UEFI Application Boot Priorities** | EFI applications — Windows Boot Manager, EFI shell, network entries | Windows Boot Manager first, disable the rest |
+
+The top-level `Boot Option Priorities` is assembled FROM those two, so fix them and
+the main list follows. Each enabled entry is something the firmware probes and waits
+on.
 
 ### 2.5 Quiet Boot / logo
 

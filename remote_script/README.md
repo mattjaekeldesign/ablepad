@@ -13,14 +13,48 @@ still a guess for the set that turns out slower.
 
 ## Install
 
+MEASURED 2026-08-13 on Live 12.4.3 by installing three differently-named copies in
+the three candidate locations and seeing which appeared in the dropdown. Exactly one
+did.
+
 1. Copy the `Ablepad/` folder to:
-   `%APPDATA%\Ableton\Live <version>\Preferences\User Remote Scripts\`
-2. Restart Live.
-3. Preferences → **Link/Tempo/MIDI** → a free **Control Surface** slot → `Ablepad`.
+
+   ```
+   C:\ProgramData\Ableton\Live 12 Suite\Resources\MIDI Remote Scripts\Ablepad\
+   ```
+
+2. Restart Live. It scans for scripts **only at startup**.
+3. Preferences → **Link, Tempo & MIDI** → a free **Control Surface** slot → `Ablepad`.
 4. Leave Input and Output as **None**. This script never sends or receives MIDI.
 
 Verify: `C:\LiveRig\Logs\ableton-ready.json` appears within a few seconds of a set
 opening, and names that set.
+
+### Locations that do NOT work — do not retry these
+
+Both are widely cited for Live and neither is listed by Live 12.4.3. Recorded so the
+next person does not spend the same half hour:
+
+| Path | Result |
+|---|---|
+| `%APPDATA%\Ableton\Live <ver>\Preferences\User Remote Scripts\` | not listed |
+| `<User Library>\Remote Scripts\` | not listed |
+| `<User Library>\MIDI Remote Scripts\` | not listed |
+
+Live logs nothing while scanning — a control surface only appears in `Log.txt` once
+it is SELECTED. So a script in the wrong place is completely silent, and the
+Preferences dropdown is the only test.
+
+### The cost of the working location
+
+`Resources\` is inside the Live installation, so **a Live update will delete this
+script**. There is no user-scoped alternative that Live 12.4.3 honours.
+
+The rig degrades safely when that happens: with no signal, the boot gate waits out
+`rig.boot_settle_s` exactly as it did before this existed, and `main.py` logs that
+the signal never arrived. It is slower, not broken. **Reinstall this script after
+every Live update**, and treat a boot that suddenly takes the full settle time as
+the symptom.
 
 ## Contract
 

@@ -2,9 +2,17 @@ r"""
 ablepad readiness Remote Script — runs INSIDE Ableton Live, not in the rig.
 
 DEPLOY TO
-    %APPDATA%\Ableton\Live <version>\Preferences\User Remote Scripts\Ablepad\
-    then Preferences -> Link/Tempo/MIDI -> Control Surface -> "Ablepad".
+    C:\ProgramData\Ableton\Live 12 Suite\Resources\MIDI Remote Scripts\Ablepad\
+    then Preferences -> Link, Tempo & MIDI -> Control Surface -> "Ablepad".
     No input or output port is needed: this script never sends MIDI.
+
+    MEASURED 2026-08-13 on Live 12.4.3. The two user-scoped locations everyone
+    recommends -- Preferences\User Remote Scripts\ and <User Library>\Remote
+    Scripts\ -- are NOT listed by Live 12.4.3. See remote_script/README.md.
+
+    Consequence: this lives inside the Live installation, so a Live update will
+    delete it. The rig falls back to its settle timer and says so in the log; it
+    gets slower, not broken. Reinstall after every Live update.
 
 WHY IT EXISTS
     Nothing outside Live can tell whether a set has finished loading. The rig's

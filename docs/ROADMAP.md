@@ -651,6 +651,20 @@ Each session, answer before writing code:
   trigger is someone's unsaved session). After the fix: 5 entries swept, no dialog,
   `ableton_audio` bound in 4 s, boot complete. Before it: 90 s timeout, every time.
 
+- **The readiness Remote Script lives inside the Live installation, so Live updates
+  delete it.** MEASURED 2026-08-13 on Live 12.4.3: only
+  `C:\ProgramData\Ableton\Live 12 Suite\Resources\MIDI Remote Scripts\` is listed in
+  the Control Surface dropdown. Both user-scoped locations that every guide
+  recommends — `Preferences\User Remote Scripts\` and `<User Library>\Remote Scripts\`
+  — are ignored, and Live logs NOTHING while scanning, so a misplaced script is
+  completely silent. Established by installing three differently-named copies and
+  seeing which appeared.
+
+  Degrades safely: with no signal the boot gate waits out `boot_settle_s` exactly as
+  before, and `main.py` logs that the signal never arrived. Slower, not broken.
+  **Re-run `tools/install-remote-script.ps1` after every Live update.** The symptom
+  is a boot that suddenly takes the full settle time again.
+
 - **`psutil.terminate()` is not graceful on Windows.** It is `TerminateProcess`, the same
   syscall as `kill()`. `terminate_gracefully()` was therefore a hard kill wearing a polite
   name, and since `SetBrowserControl` stops Live before every set change, every ordinary set

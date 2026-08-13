@@ -45,3 +45,34 @@
 #   restart_attempts: 1     one automatic restart; more would thrash the machine
 #                           mid-gig while the performer watches LEDs strobe
 #   restart_stable_s: 120   how long a run must survive to earn that restart back
+
+# ============================================================================
+# SECOND COLD BOOT — test.als instead of emergency.als, 2026-08-13
+# ============================================================================
+#
+#   23:04:45.837  started Ableton with test.als (15,239 bytes)
+#   23:04:46.209  launchpad connected            (0.4 s)
+#   23:04:49.914  ableton_audio passing          (4.1 s after launch)
+#   23:05:10.850  settled -> boot complete -> set_browser  (25.0 s total)
+#
+# 2400 ticks, 3 overruns, all during boot.
+
+# --- the confirmation this run was worth ---
+#
+#   emergency.als   6,981 bytes  -> ableton_audio at 4.1 s
+#   test.als       15,239 bytes  -> ableton_audio at 4.1 s
+#
+# Identical, for a set twice the size. That is not a coincidence and it settles
+# something: Ableton opens its audio device EARLY in startup, before it has finished
+# loading the set's contents. The time is a property of Ableton starting up, not of
+# what it is loading.
+#
+# So ableton_audio can NEVER serve as a "the set is ready" signal, no matter how
+# tempting it looks sitting there at 4 s while a 25 s timer runs. It answers a
+# different question -- "is the audio engine on the right device" -- and it answers
+# that one well.
+#
+# Which leaves the settle timer as the only proxy for "loaded", and it remains a
+# guess. Both these sets are trivial; a real set with a NAM model and IRs is the one
+# that matters, and it is the only one worth timing. The proper fix is unchanged and
+# unbuilt: an Ableton Remote Script that says READY.

@@ -52,7 +52,7 @@ ableton:
   # Ableton itself, and boot completes only if something else already did.
   # MEASURED path 2026-08-13. Ableton nests a saved set inside a "<name> Project"
   # folder, so the .als is one level deeper than where you saved it.
-  boot_set: "C:\\LiveRig\\Sets\\Emergency\\emergency Project\\emergency.als"
+  boot_set: "C:\\LiveRig\\Sets\\Candidate\\test Project\\test.als"
 
 logging:
   dir: "logs"

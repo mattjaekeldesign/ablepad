@@ -615,6 +615,53 @@ Each session, answer before writing code:
 
 ---
 
+## 4b. Boot time — measured, and where it goes
+
+MEASURED 2026-08-13 from `Microsoft-Windows-Diagnostics-Performance/Operational`,
+Event 100. Use that log rather than a stopwatch: it separates the phases, and it
+names the processes that cost the time.
+
+```text
+BIOS splash    ~20 s     not visible to Windows; BIOS settings only
+mainpath       23-32 s   kernel, drivers, logon -> desktop
+postboot       60-83 s   after the desktop appears
+total          84-112 s  + the BIOS splash
+```
+
+Worst offenders, averaged over several boots (Event 101):
+
+| | avg | verdict |
+|---|---|---|
+| `DSAService.exe` | 32.0 s | **disabled** — see below |
+| `MsMpEng.exe` | 25.5 s | Defender. Exclusions in place; the rest is a security call |
+| `Ableton Live 12 Suite.exe` | 14.8 s | the rig doing its job — keep |
+| `IntelGraphicsSoftware.exe` | 6.5 s | candidate |
+
+**Intel DSA was removed for two reasons, and the second matters more.** It was the
+single largest cost, and it exists to auto-update drivers — which contradicts
+freezing driver versions (§5) and is the most plausible way the EVO's audio driver
+changes overnight with nobody touching the machine. On a rig that is offline by
+design it can never do anything useful. `tools/trim-boot.ps1` applies this and backs
+up everything it removes.
+
+### The BIOS splash — the one Windows cannot help with
+
+~20 s before Windows starts at all, so no amount of Windows tuning touches it. On
+Beelink hardware (DEL or F7 at power-on) the usual causes, in order of how often
+they are the answer:
+
+- **Network Stack / PXE boot → Disabled.** Waiting for a boot server that will never
+  answer is the classic 15-second POST.
+- **Fast Boot → Enabled**, and **MRC Fast Boot** if offered (skips memory retraining).
+- **CSM / Legacy support → Disabled** — UEFI only, no legacy option ROMs.
+- **Boot order** pinned to the SSD, with every other device removed.
+- **Boot logo / POST delay → 0**.
+
+UNVERIFIED on this machine — nobody has been into its BIOS yet, and the exact names
+vary by firmware.
+
+---
+
 ## 5. Known limitations (accepted, documented)
 
 - Set switching will interrupt audio. Not solvable without two Live instances.

@@ -148,6 +148,14 @@ def build_boot_gate(config: RigConfig, service: LaunchpadService, machine: State
     else:
         # memory_maps() costs ~13 ms; at 30 Hz that is 38% of the tick budget, so it
         # is cached. The registry probes are 0.03 ms and run uncached.
+        #
+        # MEASURED 2026-08-13: even cached, each refresh overruns one tick -- 7
+        # overruns in 13 s at a 2 s TTL. That is ACCEPTED rather than fixed, because
+        # boot_tick() returns immediately once the state leaves BOOT, so the cost is
+        # confined to the splash screen where nothing is being performed. A 13 ms
+        # hitch in LED painting while waiting for Ableton is invisible; the same
+        # hitch during a set would not be. A longer TTL trades boot responsiveness
+        # for fewer hitches and changes nothing that matters.
         ableton_proc = probes.cached(lambda: probes.process_running(), ttl_s=1.0)
         bound = probes.cached(
             lambda: (p := ableton_proc()) is not None
@@ -158,10 +166,30 @@ def build_boot_gate(config: RigConfig, service: LaunchpadService, machine: State
         started = {"seen": False}
 
         def settled() -> bool:
-            if ableton_proc() is None:
+            """
+            Has Ableton had long enough to load its set?
+
+            Measured from the PROCESS's own start time, not from when this gate first
+            noticed it. The rig controller can restart -- a crash, a Task Scheduler
+            retry, a manual run -- while Ableton has been up for an hour. Timing from
+            "when we looked" would make every one of those restarts sit on the splash
+            screen for the full settle period waiting for something that finished long
+            ago.
+
+            Still a guess either way: process age is not set-loaded. It is just a less
+            wrong guess, and it is free -- psutil already has create_time.
+            """
+            proc = ableton_proc()
+            if proc is None:
                 started["seen"] = False
                 readiness.mark_gone()
                 return False
+            try:
+                age = time.time() - proc.create_time()
+            except Exception:  # noqa: BLE001 -- process vanished mid-check
+                age = 0.0
+            if age >= config.rig.boot_settle_s:
+                return True
             if not started["seen"]:
                 started["seen"] = True
                 readiness.mark_started()

@@ -38,3 +38,42 @@ RESULT: correct on every count.
 #     key is documented to behave that way and read correctly while attached, but
 #     nobody has watched Count drop to zero. Flagged in windows/probes.py.
 #   * the FAILED path: gate expiring at 90 s and driving the rig into Error Mode.
+
+# ============================================================================
+# SECOND RUN — Ableton open. 2026-08-13
+# ============================================================================
+#
+#   boot check now passing: launchpad -- connected
+#   boot complete: every required check passes
+#   state boot -> set_browser (BOOT_COMPLETE)
+#   controller stopped after 400 ticks (1 overruns)
+#
+# All five checks passed and the rig left the splash screen on its own. The
+# ableton_audio check -- Ableton holding audientusbaudioasio_x64.dll -- passed on
+# real hardware, which is the closest software can get to "connected to EVO sound".
+
+# --- one design flaw found and fixed between the two runs ---
+# The settle check originally timed from when the GATE first saw Ableton's process.
+# The rig controller can restart while Ableton has been up for an hour -- a crash, a
+# Task Scheduler retry, a manual run -- and every one of those restarts would sit on
+# the splash screen for the full 25 s waiting for something that finished long ago.
+#
+# Now it reads the process's own create_time. Boot took 380 ms instead of 25 s.
+# Still a guess (process age is not "set loaded"), just a less wrong one, and free.
+
+# --- one cost measured, understood, and accepted ---
+# First run: 7 overruns in 13 s. The memory_maps probe costs ~13 ms and each cache
+# refresh pushed one tick past its 33 ms budget.
+#
+# Second run: 1 overrun. Not because the probe got cheaper -- because boot completed
+# in 380 ms, and boot_tick() returns immediately once the state leaves BOOT.
+#
+# So the hitch is confined to the splash screen, where nothing is being performed.
+# 13 ms of late LED painting while waiting for Ableton is invisible; the same hitch
+# mid-set would not be. Accepted rather than engineered around.
+
+# --- an open UX question, not a bug ---
+# Boot completing in 380 ms CANCELS the 4 s boot-rain intro partway through. Correct
+# behaviour (do not make the player wait for decoration) but it looks abrupt. The
+# alternative -- let the intro finish before switching -- costs 3.6 s of dead time on
+# every boot. Decide deliberately; do not let it drift.

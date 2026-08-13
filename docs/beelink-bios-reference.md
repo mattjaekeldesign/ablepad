@@ -10,9 +10,11 @@ what is actually on screen.
 
 **Dependencies:** none — this is below every layer the rig owns.
 
-**Failure modes:** BIOS has no undo and no changelog. Photograph every screen before
-changing it. A wrong setting here can stop the machine booting at all, and the
-recovery is a CMOS reset, which loses everything else too.
+**Failure modes:** there is an undo *within a session* (**F2**, §1) and nothing
+commits until **F4** — but across sessions there is no history at all, so a setting
+changed last month is unrecoverable knowledge. Photograph every screen before
+changing it. A wrong setting can stop the machine booting entirely, and that recovery
+is a CMOS reset, which throws away everything else with it.
 
 ---
 

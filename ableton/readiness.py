@@ -35,6 +35,13 @@ class Readiness(Enum):
 class ReadinessTracker:
     settle_s: float
     clock: Callable[[], float]
+    #: The floor. A confirmed signal is NOT honoured before this many seconds have
+    #: passed, because the Remote Script's load hook is UNVERIFIED (see
+    #: ableton/ready_signal.py): if it fires mid-load, honouring it immediately
+    #: would complete boot EARLIER than the old timer did, which is worse than the
+    #: guess it replaces. With the floor, the signal can only move completion
+    #: between floor and settle_s, so the worst case is exactly today's behaviour.
+    floor_s: float = 0.0
 
     _started_at: float | None = field(default=None, init=False)
     _confirmed: bool = field(default=False, init=False)
@@ -48,7 +55,13 @@ class ReadinessTracker:
         self._confirmed = False
 
     def mark_confirmed_ready(self) -> None:
-        """Future Remote Script hook. Nothing calls this yet — that is the debt."""
+        """
+        The Remote Script says the set is loaded. Honoured no earlier than floor_s.
+
+        No longer the standing debt it was: ableton/ready_signal.py calls this when
+        the handshake file appears. Still gated, because the hook that writes that
+        file is not yet proven to run at the end of a load rather than the start.
+        """
         self._confirmed = True
 
     def state(self, process_running: bool) -> Readiness:
@@ -56,8 +69,9 @@ class ReadinessTracker:
             return Readiness.NOT_STARTED
         if not process_running:
             return Readiness.GONE
-        if self._confirmed:
+        elapsed = self.clock() - self._started_at
+        if self._confirmed and elapsed >= self.floor_s:
             return Readiness.CONFIRMED_READY
-        if self.clock() - self._started_at >= self.settle_s:
+        if elapsed >= self.settle_s:
             return Readiness.ASSUMED_READY
         return Readiness.STARTING

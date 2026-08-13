@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Protocol
 
 from ableton.crash_recovery import CrashRecovery
+from ableton.ready_signal import ReadySignal
 from ableton.process import ProcessController, ProcessHandle
 from rig.exceptions import RigError
 
@@ -55,6 +56,10 @@ class AbletonLauncher:
     #: appears -- unanswerable on a rig with no keyboard. Optional: absent means the
     #: dialog is possible, not that anything breaks.
     recovery: CrashRecovery | None = None
+    #: Cleared at every launch so a signal from the previous set can never be read
+    #: as confirmation for this one. Optional: absent just means the boot gate waits
+    #: out its settle timer.
+    ready_signal: ReadySignal | None = None
 
     _handle: ProcessHandle | None = field(default=None, init=False)
 
@@ -99,6 +104,12 @@ class AbletonLauncher:
             # definitely happening, and Live is definitely not running yet -- the one
             # moment when every journal on disk is stale rather than in use.
             self.recovery.clear()
+        if self.ready_signal is not None:
+            # Before start(), always. A signal left from the last set is
+            # indistinguishable from this set's, and reading it would confirm a set
+            # that is not loaded -- a false READY, which is the one outcome worse
+            # than waiting.
+            self.ready_signal.clear()
         self._handle = self.processes.start(self.exe, live_set)
         return self._handle
 

@@ -13,6 +13,10 @@ rig:
   tick_hz: 30            # MEASURED 2026-08-12: 899 consecutive ticks, zero overruns,
                          # each one rendering and pushing all 81 LEDs on the Beelink
   boot_timeout_s: 90     # how long the boot gate waits before showing Error Mode
+  boot_floor_s: 5         # FLOOR. A Remote Script readiness signal is ignored before
+                          # this. The hook that writes it is UNVERIFIED, so an early
+                          # signal must not be able to complete boot sooner than a
+                          # time we are willing to defend. Measure before lowering.
   boot_settle_s: 25      # Still a guess, now with one measurement against it:
                          # MEASURED 2026-08-13, the emergency set had Ableton bound
                          # to the EVO's ASIO driver 4.1 s after launch, so 21 s of
@@ -53,6 +57,12 @@ ableton:
   # MEASURED path 2026-08-13. Ableton nests a saved set inside a "<name> Project"
   # folder, so the .als is one level deeper than where you saved it.
   boot_set: "C:\\LiveRig\\Sets\\Candidate\\test Project\\test.als"
+
+  # Where the Ablepad Remote Script writes "this set is loaded" (see
+  # remote_script/README.md). The rig clears it before every launch, so anything
+  # present afterwards belongs to the set now loading. Empty disables the signal and
+  # boot falls back to waiting out rig.boot_settle_s.
+  ready_signal_path: "C:\\LiveRig\\Logs\\ableton-ready.json"
 
   # Live's crash journal. MEASURED 2026-08-13 (Live 12.4.3): every run writes
   # <appdata>\Live <version>\Preferences\Crash\<stamp>_{BaseFiles,Undo}, and a

@@ -24,6 +24,7 @@ import time
 from pathlib import Path
 
 from ableton.crash_recovery import CrashRecovery
+from ableton.ready_signal import ReadySignal
 from ableton.launcher import AbletonLauncher, LaunchRefused
 from ableton.process import PsutilProcessController
 from ableton.readiness import Readiness, ReadinessTracker
@@ -285,6 +286,11 @@ def build_ableton(config: RigConfig, bus: EventBus) -> AbletonSupervisor | None:
         processes=PsutilProcessController(),
         audio=EvoPresence(),
         recovery=recovery,
+        ready_signal=(
+            ReadySignal(Path(config.ableton.ready_signal_path))
+            if config.ableton.ready_signal_path
+            else None
+        ),
     )
     budget = RestartBudget(
         # ONE automatic restart. A restart that crashes again quickly means something
@@ -365,8 +371,25 @@ def build_boot_gate(config: RigConfig, service: LaunchpadService, machine: State
             return latched[pid]
 
         bound = probes.cached(ableton_bound, ttl_s=1.0)
-        readiness = ReadinessTracker(settle_s=config.rig.boot_settle_s, clock=time.monotonic)
+        readiness = ReadinessTracker(
+            settle_s=config.rig.boot_settle_s,
+            floor_s=config.rig.boot_floor_s,
+            clock=time.monotonic,
+        )
+        signal = (
+            ReadySignal(Path(config.ableton.ready_signal_path))
+            if config.ableton.ready_signal_path
+            else None
+        )
+        if signal is None:
+            log.warning(
+                "no ableton.ready_signal_path configured — boot will wait out the full "
+                "%.0fs settle timer instead of asking Live when its set is loaded",
+                config.rig.boot_settle_s,
+            )
+        expected = Path(config.ableton.boot_set) if config.ableton.boot_set else None
         started = {"seen": False}
+        confirmed_once = {"said": False}
 
         def settled() -> bool:
             """
@@ -396,9 +419,18 @@ def build_boot_gate(config: RigConfig, service: LaunchpadService, machine: State
             if not started["seen"]:
                 started["seen"] = True
                 readiness.mark_started()
-            return readiness.state(process_running=True) in (
-                Readiness.ASSUMED_READY, Readiness.CONFIRMED_READY,
-            )
+            if signal is not None and signal.is_ready(expected):
+                # Live said so. Still gated by floor_s inside the tracker.
+                readiness.mark_confirmed_ready()
+            state = readiness.state(process_running=True)
+            if state is Readiness.CONFIRMED_READY and not confirmed_once["said"]:
+                confirmed_once["said"] = True
+                log.info(
+                    "Live confirmed its set is loaded — boot did not have to wait out "
+                    "the %.0fs settle timer",
+                    config.rig.boot_settle_s,
+                )
+            return state in (Readiness.ASSUMED_READY, Readiness.CONFIRMED_READY)
 
         checks = build_checks(
             launchpad_connected=lambda: service.connected,

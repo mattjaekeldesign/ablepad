@@ -40,6 +40,12 @@ class RigSection:
     #: A guess -- see ableton/readiness.py. Measure it on the Beelink with the real
     #: set and a stopwatch, then put the measured value here.
     boot_settle_s: float = 25.0
+    #: The CEILING is boot_settle_s; this is the FLOOR. A Remote Script readiness
+    #: signal is not honoured before this many seconds, because the hook that writes
+    #: it is UNVERIFIED (remote_script/README.md) -- an over-eager signal would
+    #: complete boot earlier than the timer it replaces, which is worse than the
+    #: guess. Only lower this once the real gap has been measured.
+    boot_floor_s: float = 5.0
 
 
 @dataclass(frozen=True)
@@ -72,6 +78,9 @@ class AbletonSection:
     #: Empty disables the crash-journal sweep, and the recovery dialog becomes
     #: possible again. Not derived from the environment because the rig runs as a
     #: scheduled task, where %APPDATA% is whatever the task's user has.
+    #: Where the Remote Script writes its readiness handshake. Empty disables the
+    #: signal, and the rig falls back to the settle timer alone.
+    ready_signal_path: str = ""
     appdata_dir: str = ""
     #: Where swept crash journals go. They are MOVED, never deleted, because this
     #: machine also builds sets and a journal can hold genuinely unsaved work.
@@ -135,6 +144,7 @@ def load_config(path: Path) -> RigConfig:
     # Optional: sane defaults so a config written before the boot gate still loads.
     boot_timeout_s = rig_raw.get("boot_timeout_s", 90.0)
     boot_settle_s = rig_raw.get("boot_settle_s", 25.0)
+    boot_floor_s = rig_raw.get("boot_floor_s", 5.0)
     if isinstance(tick_hz, int) and not 1 <= tick_hz <= 200:
         problems.append(f"rig.tick_hz must be 1-200, got {tick_hz}")
 
@@ -159,6 +169,7 @@ def load_config(path: Path) -> RigConfig:
     restart_attempts = ableton_raw.get("restart_attempts", 1)
     restart_stable_s = ableton_raw.get("restart_stable_s", 120.0)
     sets_dir = want(ableton_raw, "ableton", "sets_dir", str)
+    ready_signal_path = ableton_raw.get("ready_signal_path", "")
     appdata_dir = ableton_raw.get("appdata_dir", "")
     crash_quarantine_dir = ableton_raw.get("crash_quarantine_dir", "")
 
@@ -175,6 +186,7 @@ def load_config(path: Path) -> RigConfig:
         rig=RigSection(
             name=str(name), tick_hz=int(tick_hz),
             boot_timeout_s=float(boot_timeout_s), boot_settle_s=float(boot_settle_s),
+            boot_floor_s=float(boot_floor_s),
         ),  # type: ignore[arg-type]
         launchpad=LaunchpadSection(
             brightness=int(brightness), port_contains=str(port_contains)  # type: ignore[arg-type]
@@ -186,6 +198,7 @@ def load_config(path: Path) -> RigConfig:
             exe=str(exe), sets_dir=str(sets_dir), boot_set=str(boot_set),
             restart_attempts=int(restart_attempts), restart_stable_s=float(restart_stable_s),
             appdata_dir=str(appdata_dir), crash_quarantine_dir=str(crash_quarantine_dir),
+            ready_signal_path=str(ready_signal_path),
         ),
         logging=LoggingSection(dir=str(log_dir), level=str(level)),
     )

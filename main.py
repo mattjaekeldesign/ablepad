@@ -157,11 +157,30 @@ def build_boot_gate(config: RigConfig, service: LaunchpadService, machine: State
         # hitch during a set would not be. A longer TTL trades boot responsiveness
         # for fewer hitches and changes nothing that matters.
         ableton_proc = probes.cached(lambda: probes.process_running(), ttl_s=1.0)
-        bound = probes.cached(
-            lambda: (p := ableton_proc()) is not None
-            and probes.process_has_module(p, probes.AUDIENT_ASIO_MODULE),
-            ttl_s=2.0,
-        )
+
+        # Once Ableton has the ASIO driver mapped it keeps it for the life of the
+        # process, so this answer is monotonic per pid: False may become True, True
+        # never goes back. Latch it and stop probing.
+        #
+        # MEASURED 2026-08-13: without the latch, a 90 s boot wait cost 45 tick
+        # overruns -- one every two seconds, each a 13 ms memory_maps call re-asking
+        # a question already answered. With it, one probe per Ableton process.
+        latched: dict[int, bool] = {}
+
+        def ableton_bound() -> bool:
+            proc = ableton_proc()
+            if proc is None:
+                latched.clear()
+                return False
+            pid = proc.pid
+            if latched.get(pid):
+                return True
+            # Only pay the 13 ms while the answer is still False -- which is exactly
+            # the window where it might change.
+            latched[pid] = probes.process_has_module(proc, probes.AUDIENT_ASIO_MODULE)
+            return latched[pid]
+
+        bound = probes.cached(ableton_bound, ttl_s=1.0)
         readiness = ReadinessTracker(settle_s=config.rig.boot_settle_s, clock=time.monotonic)
         started = {"seen": False}
 

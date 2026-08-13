@@ -77,3 +77,45 @@ RESULT: correct on every count.
 # behaviour (do not make the player wait for decoration) but it looks abrupt. The
 # alternative -- let the intro finish before switching -- costs 3.6 s of dead time on
 # every boot. Decide deliberately; do not let it drift.
+
+# ============================================================================
+# THIRD RUN — EVO unplugged. The failure path, and a verified assumption.
+# ============================================================================
+#
+# ASSUMPTION VERIFIED. windows/probes.py carried a flagged, load-bearing guess:
+# that the driver service's Enum\Count drops to 0 when the device is removed. With
+# the EVO's cable out:
+#
+#   usb_device_bound(EVO8) = False
+#   service Enum Count     = 0
+#
+# It does. Had it not, the gate would happily have booted a rig with no audio
+# interface -- defeating the entire definition of boot completion.
+#
+# FAILURE PATH VERIFIED, end to end:
+#
+#   boot check failing: evo8 -- not on the USB bus -- check the cable
+#   ... 90 s ...
+#   boot FAILED after 90s: evo8: not on the USB bus -- check the cable
+#   state boot -> error (evo8: not on the USB bus -- check the cable)
+#   playing error-spin as during
+#
+# The reason travels with the transition, so Error Mode knows WHICH thing is wrong
+# rather than just that something is. On a screenless rig that is the difference
+# between checking a cable and checking a set.
+
+# --- and an inefficiency the long wait exposed ---
+# 45 tick overruns during the 90 s wait -- one every two seconds, each a 13 ms
+# memory_maps call re-asking a question already answered. They stopped the instant
+# the state left BOOT, confirming the cost is confined there.
+#
+# Fixed by latching: once Ableton has the ASIO driver mapped it keeps it for the
+# life of the process, so the answer is monotonic per pid. False may become True;
+# True never goes back. Probe only while it is still False -- exactly the window
+# where it can change.
+#
+#   before: 45 overruns / 60 s of failing boot
+#   after :  1 overrun  / 60 s of failing boot
+#
+# The remaining 1 is the successful Launchpad connect, which is a real 113 ms of
+# settle and inquiry and is meant to be there.

@@ -61,11 +61,12 @@ def usb_device_bound(vid_pid: str = EVO8_VID_PID, service: str = AUDIENT_SERVICE
     Reads HKLM\\SYSTEM\\CurrentControlSet\\Services\\<service>\\Enum, which holds one
     entry per attached instance plus a Count. 0.03 ms.
 
-    > ASSUMPTION, not yet verified by unplugging: that Count drops to 0 when the
-    > device is removed. It is how the key is documented to behave and it matched
-    > observation while the EVO was attached (Count=1, instance
-    > 'USB\\VID_2708&PID_0007\\5&114e2b25&0&4'), but nobody has watched it go to
-    > zero. Verify before this gates anything on stage.
+    VERIFIED 2026-08-13 by unplugging the EVO mid-session:
+        attached  -> Count=1, instance 'USB\\VID_2708&PID_0007\\5&114e2b25&0&4'
+        unplugged -> Count=0, usb_device_bound() False
+    So the key tracks attachment, not history. That mattered: had it merely recorded
+    "this driver has bound something once", the boot gate would have happily started
+    a rig with no audio interface.
     """
     try:
         with winreg.OpenKey(

@@ -3,9 +3,10 @@
 **Purpose:** cut the ~20 s POST that Windows tuning cannot touch, and make the rig
 behave like an appliance at power-on.
 
-**Status:** UNVERIFIED. Written from the AMI Aptio V conventions this core version
-uses; nobody has been into this machine's BIOS yet. Menu names vary between firmware
-builds — treat each entry as "look for something like this". Correct this file with
+**Status:** PARTLY VERIFIED, 2026-08-13. The Fast Boot submenu (§2.2) was read off
+this machine and its options are recorded as found. Everything else is still written
+from AMI Aptio V conventions and UNVERIFIED here — menu names vary between firmware
+builds, so treat those as "look for something like this" and correct this file with
 what is actually on screen.
 
 **Dependencies:** none — this is below every layer the rig owns.
@@ -95,11 +96,6 @@ confirm that route works BEFORE relying on it.
 
 The cautious order is UFS and PS2 first, which are free and cannot bite, then USB
 separately so you know which one cost you the keyboard if it does.
-
-**Known cost:** with Fast Boot on, some firmware stops polling USB early enough that
-DEL no longer gets you into Setup. If that happens, get back in via Windows:
-Settings → System → Recovery → **Advanced startup → Restart now** → Troubleshoot →
-Advanced options → **UEFI Firmware Settings**. Worth knowing BEFORE you enable it.
 
 ### 2.3 CSM → **Disabled**
 

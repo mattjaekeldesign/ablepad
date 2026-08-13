@@ -152,7 +152,12 @@ Python fixes it.
 │       and two endpoints share one. tools/results/interface-names-evo8.txt
 □ EVO firmware updated WHILE STILL ONLINE; driver + firmware versions recorded
 ■ EVO Mixer tray app running (pid 2480) — CONFIRMED 2026-08-12
-□ Beelink USB port chosen and recorded (USB-A = 2 phantom channels, USB-C @1.5A = 4)
+■ Beelink USB port chosen and recorded — DONE 2026-08-13
+│   └── EVO 8 is USB-C (device) to USB-A (host), DIRECT to the root hub, no hub between
+│   └── CONSEQUENCE: 2 of 4 phantom channels only (EVO manual p.22). Fits the 2 XLR
+│       cables on hand, but that is coincidence — a third condenser needs a port change
+│   └── the box cable is USB-C to USB-C and cannot reach a USB-A host; the C-to-A cable
+│       in use is load-bearing kit. Spare in the gig bag
 ■ ASIO confirmed in Ableton — DONE 2026-08-12, 'Audient USB Audio ASIO Driver'
 ■ Guitar → EVO 8 front DI → Ableton → NAM + IR produces sound — DONE 2026-08-12
 ■ Buffer size and sample rate written down — DONE 2026-08-12

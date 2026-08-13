@@ -167,11 +167,31 @@ USB 2.0 High Speed, USB-C connector. Included cable: 1m USB-C to USB-C.  p.40
 >
 > 48 V ±4 V @ 10 mA per channel.
 
-**This makes the Beelink's port choice an audio decision, not a cabling detail.** With 2 XLR
-cables the current kit needs at most 2 phantom channels, so USB-A is sufficient *today* — but
-it silently caps the rig at two condensers forever. If the Beelink has a USB-C port that can
-deliver 1.5 A, use it, and record which physical port was used. Add the port identity to the
-Phase 0 record: USB enumeration order is already a suspect in Phase 7 boot problems.
+### DECIDED 2026-08-13: USB-C to USB-A. Two phantom channels.
+
+The EVO is connected **USB-C at the device, USB-A at the host**, straight into the Beelink's
+root hub (`Port_#0004.Hub_#0001`) with no hub in between. Direct is the right call — the
+phantom budget depends on what the *host port* delivers, not what a hub passes on.
+
+**The consequence is permanent until the cabling changes: only 2 of the 4 channels can run
++48 V at once** (p.22, p.37).
+
+That fits the current kit exactly — 2 XLR cables, so at most 2 condensers — and it is worth
+being clear that the fit is a coincidence, not headroom. A third condenser is not a cable
+away; it is a host-port change away.
+
+**Is there a USB-C upgrade path?** Unclear, and not answerable from software. The machine is
+a Beelink `AZW MINI S` (BIOS MS2V003), with two Intel xHCI controllers (USB 3.20 and 3.10).
+Windows exposes **no Type-C connector manager, no UCSI, no USB4** — which is suggestive but
+not proof: a USB-C port wired purely as a USB 3.x data port need not present one. The
+definitive check is looking at the back of the unit.
+
+If a USB-C port exists and can supply 1.5 A, moving the EVO there unlocks all four phantom
+channels. Until someone looks, assume two.
+
+**Also worth noting:** the cable in use is NOT the one in the box. Audient ships USB-C to
+USB-C (p.40), which cannot reach a USB-A host. A C-to-A cable is therefore load-bearing
+kit — put a spare in the gig bag, because it is not the cable that came with the unit.
 
 The included cable is **USB-C to USB-C**. If the Beelink's chosen port is USB-A, that cable is
 the wrong one and an adaptor becomes a load-bearing part of a touring rig. Buy a proper

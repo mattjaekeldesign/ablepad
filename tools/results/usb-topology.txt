@@ -19,10 +19,19 @@ root hub (Hub_#0001)
 # the right call for the audio interface: fewer hops, and the phantom-power budget
 # (manual p.22) depends on what the HOST port can deliver, not what a hub passes on.
 
-# --- what is still open ---
-# Whether that root port is USB-A or USB-C at 1.5 A. It decides whether 2 or 4
-# phantom channels work (EVO manual p.22) and is still an unticked Phase 0 checkbox.
-# Not answerable from software — it needs a look at the back of the Beelink.
+# --- ANSWERED 2026-08-13 ---
+# The EVO is USB-C at the device, USB-A at the host. So the host port is USB-A and
+# only 2 of the 4 phantom channels can run +48 V at once (EVO manual p.22).
+# Two XLR cables are on hand, so this fits -- by coincidence, not by headroom.
+#
+# Machine: Beelink AZW MINI S, BIOS MS2V003, Intel N150.
+# Controllers: Intel xHCI USB 3.20 and USB 3.10.
+# Windows exposes NO Type-C connector manager, no UCSI, no USB4. Suggestive that
+# there is no USB-C host port, but NOT proof -- a USB-C port wired as plain USB 3.x
+# data need not present one. Confirm by looking at the back of the unit.
+#
+# The cable in use is not the supplied one: Audient ships C-to-C (p.40), which cannot
+# reach a USB-A host. The C-to-A cable is load-bearing kit. Carry a spare.
 #
 # Both CONTROLLERS sit behind external hubs. The Launchpad is bus-powered and its
 # manual (p.5) warns low brightness may be REQUIRED for some hosts to power it at

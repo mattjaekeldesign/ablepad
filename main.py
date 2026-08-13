@@ -189,7 +189,17 @@ def build_ableton(config: RigConfig, bus: EventBus) -> AbletonSupervisor | None:
         processes=PsutilProcessController(),
         audio=EvoPresence(),
     )
-    supervisor = AbletonSupervisor(launcher=launcher, budget=RestartBudget(), bus=bus)
+    budget = RestartBudget(
+        # ONE automatic restart. A restart that crashes again quickly means something
+        # is genuinely wrong, and further attempts would thrash the machine mid-gig
+        # while the performer watches the LEDs strobe. Roadmap Phase 5.
+        max_attempts=config.ableton.restart_attempts,
+        # How long a run must survive before the budget refills. This is what
+        # separates a transient hiccup from a set that is cursed tonight.
+        stable_s=config.ableton.restart_stable_s,
+        clock=time.monotonic,
+    )
+    supervisor = AbletonSupervisor(launcher=launcher, budget=budget, bus=bus)
 
     # A crash that exhausts the restart budget is the rig's problem, not the
     # supervisor's: it publishes and the controller decides. Error Mode, naming it.

@@ -63,6 +63,11 @@ class AbletonSection:
     #: anyone picks a real set. Empty means "do not launch Ableton at boot", which
     #: is honest but means boot can only complete if something else started it.
     boot_set: str = ""
+    #: Automatic restarts allowed after a crash before the rig gives up and shows
+    #: Error Mode. One, deliberately — see ableton/recovery.py.
+    restart_attempts: int = 1
+    #: How long a run must survive before that one restart is earned back.
+    restart_stable_s: float = 120.0
 
 
 @dataclass(frozen=True)
@@ -142,6 +147,8 @@ def load_config(path: Path) -> RigConfig:
     ableton_raw = section("ableton")
     exe = want(ableton_raw, "ableton", "exe", str)
     boot_set = ableton_raw.get("boot_set", "")
+    restart_attempts = ableton_raw.get("restart_attempts", 1)
+    restart_stable_s = ableton_raw.get("restart_stable_s", 120.0)
     sets_dir = want(ableton_raw, "ableton", "sets_dir", str)
 
     log_raw = section("logging")
@@ -164,6 +171,9 @@ def load_config(path: Path) -> RigConfig:
         audio_interface=AudioSection(
             match_any=tuple(str(m) for m in match_any), require_status=str(require_status)
         ),
-        ableton=AbletonSection(exe=str(exe), sets_dir=str(sets_dir), boot_set=str(boot_set)),
+        ableton=AbletonSection(
+            exe=str(exe), sets_dir=str(sets_dir), boot_set=str(boot_set),
+            restart_attempts=int(restart_attempts), restart_stable_s=float(restart_stable_s),
+        ),
         logging=LoggingSection(dir=str(log_dir), level=str(level)),
     )

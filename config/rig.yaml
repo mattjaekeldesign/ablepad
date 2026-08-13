@@ -13,8 +13,13 @@ rig:
   tick_hz: 30            # MEASURED 2026-08-12: 899 consecutive ticks, zero overruns,
                          # each one rendering and pushing all 81 LEDs on the Beelink
   boot_timeout_s: 90     # how long the boot gate waits before showing Error Mode
-  boot_settle_s: 25      # UNVERIFIED guess at how long Ableton takes to load a set.
-                         # Measure with the real set and a stopwatch, then set it.
+  boot_settle_s: 25      # Still a guess, now with one measurement against it:
+                         # MEASURED 2026-08-13, the emergency set had Ableton bound
+                         # to the EVO's ASIO driver 4.1 s after launch, so 21 s of
+                         # this was dead wait. DO NOT lower it to match -- that set
+                         # is empty. Re-measure with the REAL performance set, which
+                         # loads a NAM model and IRs, and use that plus margin.
+                         # tools/results/cold-boot.txt
 
 launchpad:
   brightness: 40         # UNVERIFIED sane-guess. Manual p.5: low brightness may be
@@ -45,7 +50,9 @@ ableton:
   # Launched at boot so the rig reaches a usable state before anyone picks a set.
   # EMPTY until a real .als exists -- with no boot set the rig will not start
   # Ableton itself, and boot completes only if something else already did.
-  boot_set: ""
+  # MEASURED path 2026-08-13. Ableton nests a saved set inside a "<name> Project"
+  # folder, so the .als is one level deeper than where you saved it.
+  boot_set: "C:\\LiveRig\\Sets\\Emergency\\emergency Project\\emergency.als"
 
 logging:
   dir: "logs"

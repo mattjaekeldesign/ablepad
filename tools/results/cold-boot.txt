@@ -1,0 +1,47 @@
+# Full headless boot sequence — first end-to-end run, 2026-08-13
+# Beelink RIG. Ableton closed beforehand; nothing touched a keyboard.
+
+  22:56:03.620  started Ableton Live 12 Suite.exe (pid 10652) with emergency.als
+  22:56:03.621  boot gate started: 5 check(s), 90s deadline
+  22:56:04.013  launchpad connected            (0.4 s after start)
+  22:56:07.711  ableton_audio now passing      (4.1 s after Ableton launched)
+  22:56:28.619  settled now passing           (25.0 s -- the configured timer)
+  22:56:28.619  boot complete -> set_browser
+
+  total boot: 25.0 s, of which 21 s was waiting on a timer that had nothing left
+              to wait for.
+  4500 ticks / 150 s, 2 overruns. 3900 of those ticks were post-boot, with zero.
+
+# ============================================================================
+# THE MEASUREMENT THAT MATTERS: boot_settle_s is 6x too long for this set
+# ============================================================================
+#
+# Ableton bound the EVO's ASIO driver 4.1 SECONDS after launch. The settle timer
+# then held boot for another 21 s for no reason anyone can point at.
+#
+# boot_settle_s = 25 was an admitted guess. It is now a guess with one data point
+# against it -- for a nearly empty emergency set.
+#
+# DO NOT just lower it to 5. The emergency set is trivial: no plugins, no samples,
+# no NAM model. A real performance set loads a Neural Amp Modeler, IRs and whatever
+# else, and "audio device bound" happens EARLY in Ableton's startup -- well before
+# a heavy set is playable. Tuning to the emergency set would produce a rig that
+# declares itself ready while a real set is still loading.
+#
+# What to do instead:
+#   1. Boot with the REAL performance set and stopwatch from launch to first
+#      playable note. That number, plus margin, is boot_settle_s.
+#   2. Consider whether ableton_audio passing is a better readiness signal than a
+#      timer at all. It is evidence rather than arithmetic -- but it is evidence of
+#      "audio device open", not "set loaded", so it cannot simply replace the timer.
+#   3. The real fix stays the known debt: an Ableton Remote Script that says READY.
+#      ableton/readiness.py already has mark_confirmed_ready() waiting for it, and
+#      calls the current state ASSUMED_READY precisely because of this gap.
+
+# --- one bug found in wiring, before the loop ever ran ---
+# RestartBudget takes max_attempts, stable_s and clock with no defaults, and I
+# constructed it bare. It crashed at build time rather than mid-set, which is where
+# a wiring error belongs. Now configured explicitly from rig.yaml:
+#   restart_attempts: 1     one automatic restart; more would thrash the machine
+#                           mid-gig while the performer watches LEDs strobe
+#   restart_stable_s: 120   how long a run must survive to earn that restart back

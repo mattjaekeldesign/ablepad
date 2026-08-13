@@ -42,6 +42,7 @@ from rig.commands import CommandDispatcher
 from rig.controller import RigController
 from rig.mode_switch import ModeSwitch
 from rig.escape_hatch import EscapeHatch
+from rig.lifeline import WifiLifeline
 from rig.system_commands import Reboot, RestartAbleton, Shutdown
 from rig.surface_owner import SurfaceOwner
 from rig.events import AbletonClosed, AbletonGaveUp, ActionRequested, EventBus
@@ -201,6 +202,31 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
 
     bus.subscribe(ActionRequested, on_system_action)
 
+    # The way back IN. Windows auto-connect alone did not rejoin a hotspot that had
+    # been switched off and on (OBSERVED 2026-08-13), because it rescans on its own
+    # schedule and iOS sleeps Personal Hotspot until something tries to associate.
+    # So the rig asks, repeatedly, and only ever while disconnected.
+    lifeline = None
+    if config.network.lifeline_ssid:
+        try:
+            from windows.wifi import WindowsWifi  # noqa: PLC0415 -- platform import
+
+            lifeline = WifiLifeline(
+                wifi=WindowsWifi(),
+                ssid=config.network.lifeline_ssid,
+                clock=time.monotonic,
+                retry_interval_s=config.network.retry_interval_s,
+            )
+            log.info(
+                "wifi lifeline armed for %r — the rig will keep asking for it "
+                "whenever it has no network",
+                config.network.lifeline_ssid,
+            )
+        except Exception as exc:  # noqa: BLE001 -- not on Windows
+            log.warning("wifi lifeline unavailable (%s)", exc)
+    else:
+        log.info("no network.lifeline_ssid configured — no automatic way back in")
+
     def on_load_requested(event: ActionRequested) -> None:
         """A set is loading, so hand the surface back to Ableton once it is up."""
         if event.action == "LOAD_SET":
@@ -286,6 +312,11 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     launch_state = {"tried": False}
     gate = build_boot_gate(config, service, machine)
 
+    def lifeline_tick() -> None:
+        """Cheap every tick; the lifeline rate-limits itself to its retry interval."""
+        if lifeline is not None:
+            lifeline.poll()
+
     def boot_tick() -> None:
         """
         Drive the gate while, and only while, the rig is on the splash screen.
@@ -314,6 +345,7 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         on_tick=[
             boot_tick,
             (lambda: supervisor.poll()) if supervisor else (lambda: None),
+            lifeline_tick,
             lambda: surface.tick(time.monotonic() * 1000.0),
         ],
     )

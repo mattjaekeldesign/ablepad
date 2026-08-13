@@ -119,6 +119,24 @@ ableton:
   appdata_dir: "C:\\Users\\rigma\\AppData\\Roaming\\Ableton"
   crash_quarantine_dir: "C:\\LiveRig\\Logs\\crash-quarantine"
 
+network:
+  # The way back IN when everything else has failed. MEASURED 2026-08-13: this
+  # Beelink's Intel AX101 reports "Hosted network supported: No", so it cannot BE an
+  # access point without an internet connection to share. The phone makes the
+  # network instead and the rig joins it -- an iPhone Personal Hotspot gives a LAN
+  # with cellular data off, which is all VNC and SSH need.
+  #
+  # Windows auto-connect alone was NOT enough: with the profile set to connect
+  # automatically and first in preference order, a hotspot switched off and on was
+  # not rejoined. Windows rescans on its own schedule, and iOS sleeps Personal
+  # Hotspot until something tries to associate. So the rig knocks, on this interval,
+  # and ONLY while it has no network at all -- a working connection is never touched.
+  #
+  # Empty disables it. Join the network once by hand first (the password is not
+  # stored here): tools\wifi_lifeline.py --auto "<ssid>"
+  lifeline_ssid: "Trailmix"
+  retry_interval_s: 20
+
 logging:
   dir: "logs"
   level: "INFO"

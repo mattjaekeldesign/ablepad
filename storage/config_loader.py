@@ -61,6 +61,17 @@ class LaunchpadSection:
 
 
 @dataclass(frozen=True)
+class NetworkSection:
+    """
+    The offline lifeline. Empty ssid disables it, which is the honest default for a
+    rig that has not been told which network is its way back in.
+    """
+
+    lifeline_ssid: str = ""
+    retry_interval_s: float = 20.0
+
+
+@dataclass(frozen=True)
 class AudioSection:
     match_any: tuple[str, ...]  # PnP FriendlyName substrings, from interface_name_inspector.py
     require_status: str
@@ -106,6 +117,7 @@ class RigConfig:
     launchpad: LaunchpadSection
     audio_interface: AudioSection
     ableton: AbletonSection
+    network: NetworkSection
     logging: LoggingSection
 
 
@@ -180,6 +192,10 @@ def load_config(path: Path) -> RigConfig:
     appdata_dir = ableton_raw.get("appdata_dir", "")
     crash_quarantine_dir = ableton_raw.get("crash_quarantine_dir", "")
 
+    net_raw = raw.get("network") or {}
+    lifeline_ssid = net_raw.get("lifeline_ssid", "")
+    lifeline_retry = net_raw.get("retry_interval_s", 20.0)
+
     log_raw = section("logging")
     log_dir = want(log_raw, "logging", "dir", str)
     level = want(log_raw, "logging", "level", str)
@@ -207,6 +223,9 @@ def load_config(path: Path) -> RigConfig:
             restart_attempts=int(restart_attempts), restart_stable_s=float(restart_stable_s),
             appdata_dir=str(appdata_dir), crash_quarantine_dir=str(crash_quarantine_dir),
             ready_signal_path=str(ready_signal_path),
+        ),
+        network=NetworkSection(
+            lifeline_ssid=str(lifeline_ssid), retry_interval_s=float(lifeline_retry)
         ),
         logging=LoggingSection(dir=str(log_dir), level=str(level)),
     )

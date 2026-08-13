@@ -91,10 +91,15 @@ def led_spec_from_dict(index: int, led: dict | None) -> LedSpec:
 
 
 def _visible(
-    index: int, config: ModeConfig, overlay: Overlay | None, pressed: frozenset[int]
+    index: int,
+    config: ModeConfig,
+    overlay: Overlay | None,
+    pressed: frozenset[int],
+    overrides: dict[int, dict],
 ) -> dict:
     """The LED dict this pad should show, resolved through the stack. Still a dict."""
     binding = config.pads.get(index)
+    override = overrides.get(index)
 
     if overlay is not None:
         spec = overlay.frame.get(index)
@@ -103,16 +108,20 @@ def _visible(
             return spec or OFF_SPEC
         if spec is not None and index not in pressed:
             # Pressed feedback beats ambient: the player needs to see their own press.
-            if overlay.layer == "over" or binding is None:
+            # A pad carrying an override counts as bound -- it means something now,
+            # even though the static config left it blank.
+            if overlay.layer == "over" or (binding is None and override is None):
                 return spec
 
     if binding is not None:
         led = binding.led
         if index in pressed:
             return led.get("pressed") or led.get("idle") or OFF_SPEC
-        return led.get("idle") or OFF_SPEC
+        # An override replaces the pad's IDLE look only. Its pressed feedback still
+        # comes from the config, so holding a set pad looks the same on every pad.
+        return override or led.get("idle") or OFF_SPEC
 
-    return config.background or OFF_SPEC
+    return override or config.background or OFF_SPEC
 
 
 def render(
@@ -120,6 +129,7 @@ def render(
     *,
     overlay: Overlay | None = None,
     pressed: frozenset[int] | set[int] | None = None,
+    overrides: dict[int, dict] | None = None,
 ) -> list[LedSpec]:
     """
     The whole surface for this instant: 81 LedSpecs, always, in a stable order.
@@ -133,8 +143,10 @@ def render(
     honest thing to show when no mode is loaded -- rather than whatever was there.
     """
     held = frozenset(pressed or ())
+    over = overrides or {}
     if config is None:
         return [LedSpec(index=i, colour=colors.OFF) for i in grid.ALL_INDICES]
     return [
-        led_spec_from_dict(i, _visible(i, config, overlay, held)) for i in grid.ALL_INDICES
+        led_spec_from_dict(i, _visible(i, config, overlay, held, over))
+        for i in grid.ALL_INDICES
     ]

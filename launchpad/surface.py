@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import Callable
 
 from launchpad.mappings import ConfigLibrary, ModeConfig
 from launchpad.modes import resolve
@@ -80,6 +81,10 @@ class Surface:
     machine: StateMachine
     bus: EventBus
     player: AnimationPlayer = field(default_factory=AnimationPlayer)
+    #: Optional per-mode LED overrides, keyed by config id. The Set Browser uses this
+    #: to paint which slots actually hold a set. Kept as callables so the surface
+    #: never learns what a set is -- it asks, paints, and forgets.
+    overrides_for: dict[str, "Callable[[], dict[int, dict]]"] = field(default_factory=dict)
 
     _last_state: RigState | None = field(default=None, init=False)
     _held: dict[int, Hold] = field(default_factory=dict, init=False)
@@ -93,7 +98,15 @@ class Surface:
         self._arm_on_state_change(config, now_ms)
 
         overlay = self._overlay(config, now_ms)
-        specs = render(config, overlay=overlay, pressed=frozenset(self._pressed))
+        overrides = None
+        if config is not None and (provider := self.overrides_for.get(config.id)):
+            try:
+                overrides = provider()
+            except Exception:  # noqa: BLE001 -- a bad override must not blank the surface
+                log.exception("override provider for %s failed — painting without it", config.id)
+        specs = render(
+            config, overlay=overlay, pressed=frozenset(self._pressed), overrides=overrides
+        )
 
         for event in self.service.tick(now_ms / 1000.0, specs):
             self._on_pad(event, config, now_ms)

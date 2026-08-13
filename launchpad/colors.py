@@ -65,6 +65,54 @@ VERIFIED: dict[int, str] = {
 
 PALETTE_SIZE = 128  # p.12, indices 0-127
 
+#: Semantic colour name -> verified index. set_browser/models.py stores colours as
+#: NAMES precisely so an unmeasured palette index never becomes load-bearing there;
+#: this is the seam where names become indices, and it can only produce verified ones.
+_BY_NAME: dict[str, int] = {
+    "off": OFF, "black": OFF,
+    "red": RED,
+    "yellow": YELLOW, "amber": YELLOW, "orange": YELLOW,
+    "green": GREEN,
+    "bright green": GREEN_BRIGHT, "green_bright": GREEN_BRIGHT, "lime": GREEN_BRIGHT,
+    "dim green": GREEN_DIM, "green_dim": GREEN_DIM,
+    "cyan": CYAN, "turquoise": CYAN, "teal": CYAN,
+    "blue": BLUE,
+}
+
+#: What an unrecognised colour name becomes. Deliberately a real, verified colour
+#: rather than OFF: a set whose metadata names a colour we cannot render should still
+#: be VISIBLE and selectable. Losing a pad because someone wrote "puce" in sets.yaml
+#: would be a silent, gig-night failure.
+UNKNOWN_COLOR = GREEN_DIM
+
+_warned: set[str] = set()
+
+
+def by_name(name: str | None) -> int:
+    """
+    Resolve a semantic colour name to a VERIFIED palette index.
+
+    Note that models.NEUTRAL_COLOR is "white", and white is NOT among the eight
+    indices confirmed on hardware -- palette 3 looks like white in the candidate
+    table sampled from a different device, and nobody has looked at it here. So it
+    lands on UNKNOWN_COLOR like any other unverified name, and says so once.
+    """
+    if not name:
+        return UNKNOWN_COLOR
+    key = name.strip().lower()
+    if key in _BY_NAME:
+        return _BY_NAME[key]
+    if key not in _warned:
+        _warned.add(key)
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "colour %r is not one of the verified names %s — rendering it as %r. "
+            "Verify the index with tools/led_color_tester.py before relying on it.",
+            name, sorted(set(_BY_NAME)), UNKNOWN_COLOR,
+        )
+    return UNKNOWN_COLOR
+
 
 def is_verified(index: int) -> bool:
     """Has a human actually seen this index lit on a Launchpad X?"""

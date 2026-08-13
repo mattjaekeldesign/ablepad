@@ -34,12 +34,14 @@ from launchpad.modes import missing_configs
 from launchpad.service import LaunchpadService
 from launchpad.surface import Surface
 from rig.boot import BootGate, BootOutcome
+from rig.browser_control import SetBrowserControl
 from rig.boot_checks import build_checks
 from rig.commands import CommandDispatcher
 from rig.controller import RigController
 from rig.events import AbletonGaveUp, ActionRequested, EventBus
 from rig.exceptions import ConfigError
 from rig.state import RigState, StateMachine
+from set_browser.service import SetBrowserService
 from storage.config_loader import RigConfig, load_config
 
 log = logging.getLogger("main")
@@ -93,6 +95,7 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     )
     surface = Surface(service=service, library=library, machine=machine, bus=bus)
 
+
     # Until the dispatcher has commands registered, log what the surface resolves.
     # This is the Phase 3 exit criterion made visible: a press must arrive as a
     # named action, never as a note number.
@@ -102,6 +105,25 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     )
 
     supervisor = build_ableton(config, bus)
+
+    browser = SetBrowserService(sets_dir=Path(config.ableton.sets_dir))
+    found = browser.rescan()
+    log.info("set browser: %d set(s) under %s", found, config.ableton.sets_dir)
+    browser_control = SetBrowserControl(
+        browser=browser,
+        config=library.modes["set-browser"],
+        bus=bus,
+        machine=machine,
+        launcher=supervisor.launcher if supervisor else None,
+        supervisor=supervisor,
+    )
+    # The surface asks for these each tick while the Set Browser is showing. It never
+    # learns what a set is; it asks for pad colours and paints them.
+    surface.overrides_for["set-browser"] = browser_control.led_overrides
+    if config.ableton.boot_set:
+        # Boot already launched this one. Without telling the control, holding its pad
+        # would stop and relaunch a set that is already up -- a pointless silence.
+        browser_control.mark_loaded(Path(config.ableton.boot_set))
 
     def start_ableton_once() -> None:
         """

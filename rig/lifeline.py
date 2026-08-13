@@ -111,6 +111,16 @@ class WifiLifeline:
             log.debug("cannot read wifi status (%s)", exc)
             return
 
+        # ANY route out counts, not just Wi-Fi. A tethered iPhone presents as an
+        # ordinary network adapter, and a Wi-Fi-only check would see "no wifi",
+        # start knocking, and occupy the radio while the rig was already reachable
+        # over the cable.
+        if not status.connected and self._has_other_route():
+            if self._announced_down:
+                log.info("network back over another adapter (tether or ethernet)")
+            self._reset()
+            return
+
         if status.connected:
             if self._announced_down:
                 log.info("network back: on %r after %d attempt(s)", status.ssid, self._attempts)
@@ -147,6 +157,16 @@ class WifiLifeline:
         # that never widens its interval is a rig holding the radio hostage.
         self._interval = min(self._interval * 2, self.max_interval_s)
         self._next_knock_at = now + self._interval
+
+    def _has_other_route(self) -> bool:
+        """A default gateway on any adapter. False if the check is unavailable."""
+        probe = getattr(self.wifi, "has_any_network", None)
+        if probe is None:
+            return False
+        try:
+            return bool(probe())
+        except Exception:  # noqa: BLE001
+            return False
 
     def _reset(self) -> None:
         self._announced_down = False

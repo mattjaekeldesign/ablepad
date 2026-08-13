@@ -175,6 +175,35 @@ class WindowsWifi:
         log.info("%r will now be joined automatically whenever it is in range", ssid)
         return True
 
+    def has_any_network(self) -> bool:
+        """
+        Is this machine on ANY network -- Wi-Fi, Ethernet, or a tethered phone?
+
+        Asked because the lifeline must not knock at a hotspot while the rig is
+        perfectly reachable over a USB tether. An iPhone tether presents as an
+        ordinary network adapter, so a Wi-Fi-only check would see "no wifi", start
+        knocking, and occupy the radio for nothing.
+
+        Judged on having a DEFAULT GATEWAY rather than on adapter state: an adapter
+        can be Up and connected to nothing useful, and "can packets leave" is the
+        question that actually matters.
+        """
+        try:
+            result = subprocess.run(
+                [
+                    "powershell", "-NoProfile", "-Command",
+                    "@(Get-NetIPConfiguration | Where-Object "
+                    "{ $_.IPv4DefaultGateway -ne $null }).Count",
+                ],
+                capture_output=True, text=True, timeout=20,
+            )
+        except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+            return False
+        try:
+            return int(result.stdout.strip() or "0") > 0
+        except ValueError:
+            return False
+
     def connect(self, ssid: str) -> bool:
         """Join now, rather than waiting for the scan. Used by the bench tools."""
         out = self._netsh(["wlan", "connect", f'name={ssid}'])

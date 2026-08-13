@@ -193,3 +193,36 @@ def test_a_restored_connection_is_noticed_without_waiting_out_the_backoff():
     now[0] += 20
     line.poll()
     assert line.attempts == 0
+
+
+def test_it_stays_quiet_when_the_rig_is_reachable_over_a_tether():
+    # An iPhone USB tether presents as an ordinary network adapter, so a Wi-Fi-only
+    # check sees "no wifi", starts knocking, and occupies the radio while the rig is
+    # already reachable over the cable.
+    now = [0.0]
+
+    class TetheredWifi(FakeWifi):
+        def has_any_network(self):
+            return True
+
+    wifi = TetheredWifi(connected=False)
+    line = WifiLifeline(wifi=wifi, ssid="Trailmix", clock=lambda: now[0],
+                        retry_interval_s=20.0, grace_s=0.0)
+    for _ in range(5):
+        now[0] += 20
+        line.poll()
+    assert wifi.connects == [], "a working tether must silence the wifi lifeline"
+
+
+def test_it_still_knocks_when_there_is_no_route_at_all():
+    now = [0.0]
+
+    class Stranded(FakeWifi):
+        def has_any_network(self):
+            return False
+
+    wifi = Stranded(connected=False)
+    line = WifiLifeline(wifi=wifi, ssid="Trailmix", clock=lambda: now[0],
+                        retry_interval_s=20.0, grace_s=0.0)
+    line.poll()
+    assert wifi.connects == ["Trailmix"]

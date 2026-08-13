@@ -32,10 +32,15 @@ log = logging.getLogger(__name__)
 
 #: How long to wait for Live to close before killing it. THREE seconds, not ten.
 #:
-#: The wait only runs long when Live is asking "save changes to <set>?" -- a modal
-#: nothing headless can answer, so every second past the first is silence on stage
-#: for an answer that is never coming. OBSERVED 2026-08-13: a set nobody edited put
-#: that prompt up, so this is the normal path, not an edge case.
+#: The wait only runs long when Live is holding a modal open -- "save changes to
+#: <set>?", or the recovery dialog. Nothing headless can answer either, so every
+#: second past the first is silence on stage for an answer that is never coming.
+#:
+#: NOT because sets dirty themselves. That was claimed here on 2026-08-13 and was
+#: wrong: the experiment behind it force-killed Live and relaunched WITHOUT sweeping
+#: the crash journal, so Live opened into the recovery dialog and refused to close.
+#: Re-run with the sweep (tools/check_dirty.py), test.als closes cleanly untouched.
+#: A save prompt in normal use means something really did change the set.
 #:
 #: Killing after the timeout used to be expensive: it left Live's crash journal
 #: behind and armed the recovery dialog on next launch. ableton/crash_recovery.py

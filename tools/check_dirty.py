@@ -12,6 +12,17 @@ WHY THIS MATTERS
     timeout, but only if the set really is dirtying itself rather than someone
     having nudged a control.
 
+THE TRAP THIS TOOL FELL INTO ONCE
+    Its first version force-killed Live and then launched it DIRECTLY, bypassing
+    AbletonLauncher -- and therefore bypassing crash_recovery.clear(). A force kill
+    leaves a crash journal, so the very next launch opened into "recover the last
+    session?" instead of the set.
+
+    That produced a run with no readiness signal and a Live that would not close,
+    which reads exactly like "the set dirties itself" and was nothing of the kind.
+    Sweeping the journal is not tidiness here; it is what makes the result mean
+    anything at all.
+
 THE EXPERIMENT
     launch the set -> wait for it to finish loading -> touch NOTHING -> ask it to
     close with WM_CLOSE -> see whether it goes.
@@ -35,6 +46,10 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+# Run as a script from tools/, so sys.path[0] is tools/ and the rig package is not
+# importable without this.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 SIGNAL = Path(r"C:\LiveRig\Logs\ableton-ready.json")
 #: Time to sit still after the set reports ready, before asking it to close. Long
@@ -78,6 +93,17 @@ def main(argv: list[str]) -> int:
         p.kill()
     time.sleep(3)
     SIGNAL.unlink(missing_ok=True)
+
+    # MUST happen after the kill and before the launch. Otherwise this measures the
+    # recovery dialog and calls it a save prompt -- see THE TRAP above.
+    from ableton.crash_recovery import CrashRecovery  # noqa: PLC0415
+
+    sweep = CrashRecovery(
+        ableton_appdata=Path(r"C:\Users\rigma\AppData\Roaming\Ableton"),
+        quarantine=Path(r"C:\LiveRig\Logs\crash-quarantine"),
+    )
+    swept = sweep.clear()
+    print("swept %d crash journal entries (so no recovery dialog can confound this)" % swept)
 
     print("launching %s, then leaving it completely alone" % live_set.name)
     proc = psutil.Popen([str(exe), str(live_set)])

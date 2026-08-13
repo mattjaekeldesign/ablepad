@@ -82,29 +82,72 @@ export const PAD_STATES = ['idle', 'pressed', 'active']
  *
  * `defaultHold` (ms) pre-fills action.hold_ms — hold-to-confirm gates from the roadmap:
  * load set 2 s, reboot 4 s (System Mode), shutdown 6 s.
+ *
+ * `status` says whether the RIG can actually do this yet, and `note` says where it
+ * lives or why it cannot. This exists because the Lab happily let you design a pad
+ * calling PANIC_MUTE, which nothing implements — the pad lights up on the real
+ * device and does nothing at all. A lit pad is a promise, and the cheapest place to
+ * catch a promise the rig cannot keep is here, while you are making it.
+ *
+ *   'live'    the rig executes this today
+ *   'planned' declared and NOT implemented; the pad will light and do nothing
+ *
+ * Keep this honest. It is only useful if it is true — verify against main.py's
+ * dispatcher registrations and its UNIMPLEMENTED table before changing a status.
+ * Last reconciled 2026-08-13.
  */
 export const ACTIONS = {
   NONE: { label: 'No action', params: {} },
   SWITCH_MODE: {
     label: 'Switch mode',
     params: { target: { type: 'configRef', label: 'Target mode' } },
+    status: 'live',
+    note: 'rig/mode_switch.py. A target the state machine cannot reach from here is logged and ignored, not an error.',
   },
   LOAD_SET: {
     label: 'Load Ableton set',
     params: { slot: { type: 'number', label: 'Set slot', min: 0, max: 63, step: 1 } },
     defaultHold: 2000,
+    status: 'live',
+    note: 'rig/browser_control.py. Slot maps to the browser page, so moving a set to another pad is a Lab decision, never a code one. Stops Live first — switching sets is a silence.',
   },
-  PAGE_NEXT: { label: 'Next page', params: {} },
-  PAGE_PREV: { label: 'Previous page', params: {} },
-  RESCAN_SETS: { label: 'Rescan set folder', params: {} },
-  ABLETON_RESTART: { label: 'Restart Ableton', params: {}, defaultHold: 2000 },
-  PANIC_MUTE: { label: 'Panic mute', params: {} },
-  HOTSPOT_TOGGLE: { label: 'Hotspot on/off', params: {} },
-  SYSTEM_REBOOT: { label: 'Reboot Beelink', params: {}, defaultHold: 4000 },
-  SYSTEM_SHUTDOWN: { label: 'Shut down Beelink', params: {}, defaultHold: 6000 },
+  PAGE_NEXT: {
+    label: 'Next page', params: {}, status: 'live',
+    note: 'rig/browser_control.py. Only meaningful with more than 16 sets.',
+  },
+  PAGE_PREV: {
+    label: 'Previous page', params: {}, status: 'live',
+    note: 'rig/browser_control.py.',
+  },
+  RESCAN_SETS: {
+    label: 'Rescan set folder', params: {}, status: 'live',
+    note: 'rig/browser_control.py. Finding nothing sends the rig to Error Mode — an empty browser is a fault, not a blank screen.',
+  },
+  ABLETON_RESTART: {
+    label: 'Restart Ableton', params: {}, defaultHold: 2000, status: 'live',
+    note: 'rig/system_commands.py. Stops the current set and relaunches THAT set — the one loaded when you press, not the one that booted.',
+  },
+  PANIC_MUTE: {
+    label: 'Panic mute', params: {}, status: 'planned',
+    note: 'Nothing implements this. It also needs a decision first: the rig does not own the audio path, so a mute means driving Ableton — which is what the handover deliberately hands away.',
+  },
+  HOTSPOT_TOGGLE: {
+    label: 'Hotspot on/off', params: {}, status: 'planned',
+    note: "MEASURED 2026-08-13: the Beelink's Intel AX101 reports 'Hosted network supported: No', so it cannot run an access point without an internet connection to share. Likely unbuildable on this hardware — see docs/ROADMAP.md Phase 6.",
+  },
+  SYSTEM_REBOOT: {
+    label: 'Reboot Beelink', params: {}, defaultHold: 4000, status: 'live',
+    note: 'windows/power.py. Unrecoverable without physical access — hence the 4 s hold.',
+  },
+  SYSTEM_SHUTDOWN: {
+    label: 'Shut down Beelink', params: {}, defaultHold: 6000, status: 'live',
+    note: 'windows/power.py. The rig CANNOT turn itself back on. The longest hold on the surface, and it should stay that way.',
+  },
   SEND_MIDI: {
     label: 'Send raw MIDI',
     params: { message: { type: 'text', label: 'Bytes (hex, e.g. B0 07 7F)' } },
+    status: 'planned',
+    note: 'Nothing implements this. Note that during a set the rig has RELEASED the Launchpad to Ableton, so a rig-sent MIDI message is not how performance control works — see the Handover note on Performance mode.',
   },
 }
 
@@ -388,4 +431,46 @@ export function validateAnimation(anim) {
   }
 
   return { ok: errors.length === 0, errors }
+}
+
+
+/* ═════════════════════════════════════════════════ what each mode is really for */
+
+/**
+ * Per-mode facts the Lab cannot infer from a config file, keyed by config id.
+ *
+ * These exist because the most important thing about a mode is often something the
+ * JSON cannot say. The clearest example: as of 2026-08-13 the rig HANDS THE
+ * LAUNCHPAD TO ABLETON while a set is playing, so pads designed in Performance mode
+ * are never rendered by the rig at all. Nothing in performance.json hints at that,
+ * and you would only discover it by designing a screen that never appears.
+ *
+ * Reconcile against rig/surface_owner.py when the ownership rules change.
+ */
+export const MODE_NOTES = {
+  boot: {
+    summary: 'Shown while Ableton starts. The rig owns the surface here — nothing else is running yet.',
+    detail:
+      'Boot ends when the gate passes every check: Launchpad connected, EVO enumerated, Ableton running and holding the EVO ASIO driver, and the set confirmed loaded by the Ablepad Remote Script. Roughly 8 s. Pads here are barely reachable, so this mode is mostly its intro animation.',
+  },
+  'set-browser': {
+    summary: 'The launcher, and where the rig lands when Ableton is closed or something went wrong.',
+    detail:
+      'LOAD_SET slots map to the browser page, so moving a set to a different pad is a decision made HERE and never in Python. Lit means loadable: slots with no set behind them are painted dark, because a pad that lies about what it will do is discovered by standing in silence. Reachable during a set by pressing CUSTOM on the Launchpad and holding the top-left pad for 2 s.',
+  },
+  performance: {
+    summary: 'MOSTLY NOT RENDERED — during a set the rig hands the Launchpad to Ableton.',
+    detail:
+      "As of 2026-08-13 the rig releases the surface once a set is up, so Live's own Launchpad X script drives it and pads designed here do not appear. This is deliberate: Ableton owns performance mapping (map your pads inside Live). What this config still governs is the moments the rig HAS the surface — before a set loads, and any time Error Mode takes it back. Designing a rich performance screen here is effort that will never reach the device.",
+  },
+  system: {
+    summary: 'Troubleshooting, one step from the browser. Hold pad 98 in the Set Browser.',
+    detail:
+      'The destructive actions live here on purpose: two deliberate mode switches from anywhere a performer stands, each behind a hold long enough to survive a scuffed pad. Restart Ableton 2 s, Reboot 4 s, Shutdown 6 s. Hold progress is visible on the pad, so a hold started by accident can be seen and abandoned.',
+  },
+  error: {
+    summary: 'The one mode that TAKES the surface back from Ableton, mid-set if it has to.',
+    detail:
+      'An ESD-wedged EVO enumerates perfectly and outputs silence, so a Launchpad still showing Live\'s session view while the rig makes no sound is the worst thing this surface can do. Error Mode overrides handover for exactly that reason. Colours here should be unmistakable at a glance on a dark stage.',
+  },
 }

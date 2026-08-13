@@ -29,6 +29,7 @@ import {
 import {
   ACTIONS,
   ACTION_TYPES,
+  MODE_NOTES,
   LED_TYPES,
   PAD_STATES,
   PAD_IDS,
@@ -194,6 +195,17 @@ function renderConfigView(config) {
   head.append(titleRow, el('div', 'ins-sub', `${config.id}.json`))
   summaryLine = el('div', 'ins-summary', padsBoundText(config))
   head.append(summaryLine)
+
+  // What this mode is actually FOR — facts the JSON cannot carry. Chiefly: whether
+  // the rig even renders it, which for Performance mode is now mostly "no".
+  const modeNote = MODE_NOTES[config.id]
+  if (modeNote) {
+    const box = el('div', /NOT RENDERED|TAKES the surface/.test(modeNote.summary) ? 'ins-warn' : 'ins-hint')
+    box.append(el('strong', '', modeNote.summary))
+    box.append(el('div', 'ins-note-detail', modeNote.detail))
+    head.append(box)
+  }
+
   panel.append(head)
 
   // Mode ­— identity fields.
@@ -510,7 +522,12 @@ function actionSection(padId, pad) {
   const spec = ACTIONS[action.type] ?? ACTIONS.NONE
   const { root: sec, body } = makeSection('Action')
 
-  const typeOptions = ACTION_TYPES.map((t) => ({ value: t, label: ACTIONS[t].label }))
+  // Mark the ones the rig cannot do yet IN THE DROPDOWN, so the gap is visible
+  // before the choice is made rather than after the pad is on the device.
+  const typeOptions = ACTION_TYPES.map((t) => ({
+    value: t,
+    label: ACTIONS[t].status === 'planned' ? `${ACTIONS[t].label} (not built)` : ACTIONS[t].label,
+  }))
   body.append(
     makeRow('Type', makeSelect(typeOptions, action.type, (type) => {
       // Replace the WHOLE action: mergeDeep would otherwise keep the old
@@ -527,6 +544,16 @@ function actionSection(padId, pad) {
       render() // new type → new param fields
     })),
   )
+
+  // What the rig actually does with this, or why it does nothing. The Lab used to
+  // let you design a pad calling an action nothing implements: it lights up on the
+  // real device and does absolutely nothing, with no way to tell from the surface.
+  if (action.type !== 'NONE' && spec.note) {
+    const planned = spec.status === 'planned'
+    const box = el('div', planned ? 'ins-warn' : 'ins-hint')
+    box.textContent = planned ? `NOT BUILT — ${spec.note}` : spec.note
+    body.append(box)
+  }
 
   for (const [key, paramSpec] of Object.entries(spec.params)) {
     body.append(makeRow(paramSpec.label ?? key, paramControl(padId, key, paramSpec, action.params?.[key])))

@@ -134,7 +134,17 @@ network:
   #
   # Empty disables it. Join the network once by hand first (the password is not
   # stored here): tools\wifi_lifeline.py --auto "<ssid>"
-  lifeline_ssid: "Trailmix"
+  # DISABLED pending verification. On 2026-08-13 the Beelink went off-network and
+  # did not recover while an earlier, more aggressive version of this watchdog was
+  # running -- knocking every 20 s from the moment it saw no network, which can
+  # occupy the radio during the reassociation Windows was attempting on its own.
+  # Cause not proven, and that is exactly why this is off: re-enabling an unverified
+  # suspect on the machine it may have stranded is not a test, it is a gamble.
+  #
+  # rig/lifeline.py now waits GRACE_S before the first attempt and backs off to
+  # MAX_INTERVAL_S. Set the ssid back to "Trailmix" once that has been watched
+  # through a real off/on cycle with the log visible.
+  lifeline_ssid: ""
   retry_interval_s: 20
 
 logging:

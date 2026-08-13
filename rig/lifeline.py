@@ -28,8 +28,18 @@ WHAT IT WILL NOT DO
     wifi by hand must not be undone by a watchdog, and a rig that hops networks
     mid-set to satisfy a policy is worse than one that stays put.
 
-    That also makes the failure mode benign: the worst this can do is ask an absent
-    network for a connection every 20 seconds, which costs nothing and logs once.
+    THE FAILURE MODE THIS ALMOST HAD
+        The first version knocked every 20 s forever, from the moment it saw no
+        network. A connect attempt aimed at an absent SSID occupies the radio, and
+        Windows reassociating with a network it already knows is a process that must
+        not be interrupted -- so a watchdog meant to keep the rig reachable could
+        instead stop it recovering on its own. SUSPECTED of doing exactly that on
+        2026-08-13, when the Beelink went off-network and stayed there.
+
+        Hence the grace period and the backoff. A watchdog must never leave the rig
+        LESS reachable than no watchdog at all; if it cannot guarantee that, it
+        should not run -- which is why it ships disabled until the fix is verified
+        on hardware.
 """
 
 from __future__ import annotations
@@ -42,10 +52,21 @@ log = logging.getLogger(__name__)
 
 __all__ = ["WifiLifeline"]
 
-#: Seconds between attempts while disconnected. Short enough that switching the
-#: hotspot on and putting the phone in a pocket is enough, long enough that it is
-#: not hammering the radio -- each attempt is a real association attempt, not a scan.
+#: First gap between attempts. Doubles from here -- see MAX_INTERVAL_S.
 RETRY_INTERVAL_S = 20.0
+
+#: The ceiling on backoff. A rig that has been away from its hotspot for an hour
+#: should be knocking every few minutes, not three times a minute forever.
+MAX_INTERVAL_S = 300.0
+
+#: How long the rig must have been off-network before the FIRST knock.
+#:
+#: This is the important one. A connect attempt aimed at an absent network occupies
+#: the radio, and Windows reassociating with a network it already knows is a process
+#: that must not be interrupted. Left to itself the adapter recovers; knocked at
+#: every 20 seconds it may not. So: let Windows try first, and only start asking
+#: once it has clearly failed on its own.
+GRACE_S = 60.0
 
 
 @dataclass
@@ -61,8 +82,17 @@ class WifiLifeline:
     ssid: str
     clock: Callable[[], float]
     retry_interval_s: float = RETRY_INTERVAL_S
+    max_interval_s: float = MAX_INTERVAL_S
+    grace_s: float = GRACE_S
 
-    _next_attempt_at: float = field(default=0.0, init=False)
+    #: Two cadences on purpose. Status is checked at the FIXED interval so a
+    #: restored connection is noticed promptly; knocks back off, because they cost
+    #: radio time and a status read does not. Sharing one clock meant a rig that had
+    #: been away an hour would not notice it was back for another five minutes.
+    _next_status_at: float = field(default=0.0, init=False)
+    _next_knock_at: float = field(default=0.0, init=False)
+    _down_since: float | None = field(default=None, init=False)
+    _interval: float = field(default=RETRY_INTERVAL_S, init=False)
     _announced_down: bool = field(default=False, init=False)
     _attempts: int = field(default=0, init=False)
 
@@ -71,9 +101,9 @@ class WifiLifeline:
         if not self.ssid:
             return
         now = self.clock()
-        if now < self._next_attempt_at:
+        if now < self._next_status_at:
             return
-        self._next_attempt_at = now + self.retry_interval_s
+        self._next_status_at = now + self.retry_interval_s
 
         try:
             status = self.wifi.status()
@@ -84,17 +114,26 @@ class WifiLifeline:
         if status.connected:
             if self._announced_down:
                 log.info("network back: on %r after %d attempt(s)", status.ssid, self._attempts)
-                self._announced_down = False
-                self._attempts = 0
+            self._reset()
             return
 
+        if self._down_since is None:
+            self._down_since = now
+
+        # Let Windows recover on its own first. Knocking during that window is how a
+        # watchdog stops the very reassociation it is supposed to help.
+        if now - self._down_since < self.grace_s:
+            return
+
+        if now < self._next_knock_at:
+            return  # backed off; still watching, just not asking yet
+
         if not self._announced_down:
-            # Once, then quietly. Being off-network is the NORMAL state of this rig
-            # -- it is offline by design -- so this must not fill the log.
+            # Once, then quietly. Being off-network is this rig's NORMAL state.
             log.info(
-                "no network; will keep asking for %r every %.0fs so the lifeline is "
-                "there when it is needed",
-                self.ssid, self.retry_interval_s,
+                "off-network for %.0fs; asking for %r, backing off up to %.0fs "
+                "between attempts",
+                self.grace_s, self.ssid, self.max_interval_s,
             )
             self._announced_down = True
 
@@ -103,6 +142,18 @@ class WifiLifeline:
             self.wifi.connect(self.ssid)
         except Exception as exc:  # noqa: BLE001
             log.debug("connect attempt failed (%s)", exc)
+
+        # Back off. The target may be a hotspot in a bag two towns away, and a rig
+        # that never widens its interval is a rig holding the radio hostage.
+        self._interval = min(self._interval * 2, self.max_interval_s)
+        self._next_knock_at = now + self._interval
+
+    def _reset(self) -> None:
+        self._announced_down = False
+        self._attempts = 0
+        self._down_since = None
+        self._interval = self.retry_interval_s
+        self._next_knock_at = 0.0
 
     @property
     def attempts(self) -> int:

@@ -121,9 +121,29 @@ one list.
 | **UEFI Hard Disk Drive BBS Priorities** | among the drives themselves | NVMe SSD first |
 | **UEFI Application Boot Priorities** | EFI applications — Windows Boot Manager, EFI shell, network entries | Windows Boot Manager first, disable the rest |
 
-The top-level `Boot Option Priorities` is assembled FROM those two, so fix them and
-the main list follows. Each enabled entry is something the firmware probes and waits
-on.
+The top-level `Boot Option Priorities` is assembled FROM those two. As found
+2026-08-13:
+
+    1  NVMe                                 keep
+    2  Hard Disk: Windows Boot Manager SSD  keep
+    3  CD/DVD                               -> Disabled, no optical drive fitted
+    4  SD                                   -> Disabled, nothing in the slot
+    5  USB devices                          LEAVE -- see below
+    6  Network                              -> Disabled, the PXE entry
+    7  EFI AP                               LEAVE -- see below
+
+**Leave #5 USB.** Disabling it means recovery media will not boot without coming back
+into Setup first, and Setup is exactly what you cannot reach on the day you need
+recovery media. A small time saving against a bad afternoon.
+
+**Leave #7 EFI AP.** Windows Boot Manager is itself an EFI application and it is not
+certain it is not classified here. "Probably fine" is not a standard to apply to the
+entry that boots the machine.
+
+**And note what this does NOT buy.** Entry 6 is only ever TRIED if 1-5 all fail, which
+never happens — so disabling it saves almost nothing by itself. The cost is the
+network stack being INITIALISED during POST at all, which is §2.1's master switch.
+Disable that and entry 6 disappears on its own.
 
 ### 2.5 Quiet Boot / logo
 

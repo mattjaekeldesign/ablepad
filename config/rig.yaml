@@ -42,6 +42,10 @@ ableton:
   # MEASURED 2026-08-12. Note ProgramData, not Program Files -- a guess would be wrong.
   exe: "C:\\ProgramData\\Ableton\\Live 12 Suite\\Program\\Ableton Live 12 Suite.exe"
   sets_dir: "C:\\LiveRig\\Sets"                                           # roadmap §8 tree
+  # Launched at boot so the rig reaches a usable state before anyone picks a set.
+  # EMPTY until a real .als exists -- with no boot set the rig will not start
+  # Ableton itself, and boot completes only if something else already did.
+  boot_set: ""
 
 logging:
   dir: "logs"

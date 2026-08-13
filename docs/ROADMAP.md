@@ -464,8 +464,18 @@ ableton/
 ◪ = policy built+tested off-rig with fakes; the psutil adapter (`ableton/process.py`)
 is the ONLY unverified seam and gets one bench session on the Beelink.
 
-**STATUS: BUILT AND GREEN.** `ableton/{launcher,process,readiness,recovery,supervisor}.py`,
+**STATUS: BUILT, TESTED, AND NOW WIRED.** `ableton/{launcher,process,readiness,recovery,supervisor}.py`,
 covered by `tests/test_{ableton,supervisor}.py`.
+
+Wired into `main.py` 2026-08-13: the boot sequence launches `ableton.boot_set` once,
+the supervisor polls every tick, and `AbletonGaveUp` drives the rig into Error Mode.
+`windows/audio.py` supplies the audio-presence precondition from the registry probe.
+
+**Blocked on content, not code: `ableton.boot_set` is empty because no `.als` exists
+yet.** `Sets/Emergency/` is the intended home — one known-good file that always
+loads, so the rig reaches a usable state before anyone picks a real set. Until it
+exists the rig declines to launch Ableton, says so once, and lets the boot gate fail
+in its own words. That is the honest behaviour, and it is not the finished one.
 
 **Risk: High.** "Process exists" ≠ "set loaded". Until an Ableton Remote Script sends a READY
 signal, readiness is a timing guess. Accept that for now; log it as known debt.

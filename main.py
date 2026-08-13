@@ -23,7 +23,11 @@ import sys
 import time
 from pathlib import Path
 
+from ableton.launcher import AbletonLauncher, LaunchRefused
+from ableton.process import PsutilProcessController
 from ableton.readiness import Readiness, ReadinessTracker
+from ableton.recovery import RestartBudget
+from ableton.supervisor import AbletonSupervisor
 from launchpad.backend_mido import MidoBackend
 from launchpad.mappings import load_library
 from launchpad.modes import missing_configs
@@ -33,12 +37,16 @@ from rig.boot import BootGate, BootOutcome
 from rig.boot_checks import build_checks
 from rig.commands import CommandDispatcher
 from rig.controller import RigController
-from rig.events import ActionRequested, EventBus
+from rig.events import AbletonGaveUp, ActionRequested, EventBus
 from rig.exceptions import ConfigError
 from rig.state import RigState, StateMachine
 from storage.config_loader import RigConfig, load_config
 
 log = logging.getLogger("main")
+
+#: Set by build() so the AbletonGaveUp subscriber can reach the state machine without
+#: build_ableton() taking a parameter it has no other use for.
+machine_ref: dict[str, StateMachine] = {}
 
 
 def setup_logging(config: RigConfig) -> None:
@@ -63,6 +71,7 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     """
     bus = EventBus()
     machine = StateMachine(bus=bus)
+    machine_ref["m"] = machine
     dispatcher = CommandDispatcher()
     # Commands register here as later phases add them. Empty still — and dispatch of
     # anything therefore fails loudly, which is correct.
@@ -92,6 +101,31 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         lambda e: log.info("ACTION %s from pad %d params=%s", e.action, e.pad, e.params),
     )
 
+    supervisor = build_ableton(config, bus)
+
+    def start_ableton_once() -> None:
+        """
+        Launch the boot set, at most once per rig start.
+
+        Deliberately not retried in a loop. If the launch is refused the reasons are
+        real -- a missing exe, a missing set, no audio interface -- and none of them
+        get better by trying again 30 times a second. The boot gate is what notices
+        Ableton never appeared, and it reports that in its own words after the
+        deadline.
+        """
+        if supervisor is None or launch_state["tried"]:
+            return
+        launch_state["tried"] = True
+        boot_set = Path(config.ableton.boot_set)
+        try:
+            supervisor.launcher.launch(boot_set)
+            supervisor.watch(boot_set)
+            log.info("launched Ableton with %s", boot_set)
+        except LaunchRefused as exc:
+            # Named, once, and then left alone. Boot will fail on its own terms.
+            log.error("not launching Ableton: %s", "; ".join(exc.reasons))
+
+    launch_state = {"tried": False}
     gate = build_boot_gate(config, service, machine)
 
     def boot_tick() -> None:
@@ -103,6 +137,7 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         """
         if machine.state is not RigState.BOOT:
             return
+        start_ableton_once()
         outcome = gate.evaluate()
         if outcome is BootOutcome.COMPLETE:
             machine.transition(RigState.SET_BROWSER, "BOOT_COMPLETE")
@@ -118,9 +153,51 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         tick_hz=config.rig.tick_hz,
         clock=time.monotonic,
         sleep=time.sleep,
-        on_tick=[boot_tick, lambda: surface.tick(time.monotonic() * 1000.0)],
+        on_tick=[
+            boot_tick,
+            (lambda: supervisor.poll()) if supervisor else (lambda: None),
+            lambda: surface.tick(time.monotonic() * 1000.0),
+        ],
     )
     return controller, surface
+
+
+def build_ableton(config: RigConfig, bus: EventBus) -> AbletonSupervisor | None:
+    """
+    The launcher and its supervisor, or None when we cannot run Ableton at all.
+
+    None on a non-Windows host: psutil can see processes anywhere, but the exe path
+    is a Windows path and the audio probe is a registry read. Returning None rather
+    than a crippled object keeps the failure at the wiring layer, where it can be
+    logged once, instead of scattering `if platform` through the services.
+    """
+    try:
+        from windows.audio import EvoPresence  # noqa: PLC0415 — platform import
+    except Exception as exc:  # noqa: BLE001
+        log.warning("no audio-presence probe (%s) — Ableton will not be launched", exc)
+        return None
+
+    if not config.ableton.boot_set:
+        log.warning(
+            "ableton.boot_set is empty — the rig will NOT start Ableton itself. "
+            "Boot can only complete if something else already did."
+        )
+        return None
+
+    launcher = AbletonLauncher(
+        exe=Path(config.ableton.exe),
+        processes=PsutilProcessController(),
+        audio=EvoPresence(),
+    )
+    supervisor = AbletonSupervisor(launcher=launcher, budget=RestartBudget(), bus=bus)
+
+    # A crash that exhausts the restart budget is the rig's problem, not the
+    # supervisor's: it publishes and the controller decides. Error Mode, naming it.
+    bus.subscribe(
+        AbletonGaveUp,
+        lambda e: machine_ref["m"].transition(RigState.ERROR, f"Ableton gave up: {e.set_name}"),
+    )
+    return supervisor
 
 
 def build_boot_gate(config: RigConfig, service: LaunchpadService, machine: StateMachine) -> BootGate:

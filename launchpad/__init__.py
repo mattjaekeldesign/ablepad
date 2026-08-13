@@ -14,6 +14,8 @@ LAYER: Drivers + Services for the one piece of hardware that is the whole UI.
 
     modes.py         which surface a RigState shows. A table, not string munging.
     renderer.py      state + animation + presses -> 81 LedSpecs. Pure.
+    service.py       owns the connection, survives losing it. The controller's
+                     only entry point into any of this.
 
 Phase 3's modules are all present. What has never happened is any of it running
 against the device: the exit test (connect, survive 20 replugs, a press arriving as

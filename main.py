@@ -390,6 +390,23 @@ def build_boot_gate(config: RigConfig, service: LaunchpadService, machine: State
         expected = Path(config.ableton.boot_set) if config.ableton.boot_set else None
         started = {"seen": False}
         confirmed_once = {"said": False}
+        last_state: dict[str, object] = {"value": None}
+
+        def settled_detail() -> str:
+            """
+            Why the settle check passed -- confirmation or timer. The gate labels this
+            check GUESS because that is its worst case, so the detail is the only place
+            the difference is visible, and it is the difference the whole readiness
+            signal exists to create.
+            """
+            if last_state["value"] is Readiness.CONFIRMED_READY:
+                return "Live confirmed the set is loaded (not a guess)"
+            if last_state["value"] is Readiness.ASSUMED_READY:
+                return (
+                    "settle timer elapsed, no confirmation from Live — is the Ablepad "
+                    "Remote Script still installed? (remote_script/README.md)"
+                )
+            return "still settling"
 
         def settled() -> bool:
             """
@@ -423,6 +440,7 @@ def build_boot_gate(config: RigConfig, service: LaunchpadService, machine: State
                 # Live said so. Still gated by floor_s inside the tracker.
                 readiness.mark_confirmed_ready()
             state = readiness.state(process_running=True)
+            last_state["value"] = state
             if state is Readiness.CONFIRMED_READY and not confirmed_once["said"]:
                 confirmed_once["said"] = True
                 log.info(
@@ -438,6 +456,7 @@ def build_boot_gate(config: RigConfig, service: LaunchpadService, machine: State
             ableton_running=lambda: ableton_proc() is not None,
             ableton_bound_to_evo=lambda: bool(bound()),
             ableton_settled=settled,
+            settled_detail=settled_detail,
         )
 
     return BootGate(checks=checks, timeout_s=config.rig.boot_timeout_s, clock=time.monotonic)

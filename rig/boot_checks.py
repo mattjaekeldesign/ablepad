@@ -28,6 +28,7 @@ def build_checks(
     ableton_running: Callable[[], bool],
     ableton_bound_to_evo: Callable[[], bool],
     ableton_settled: Callable[[], bool],
+    settled_detail: Callable[[], str] = lambda: "settle time elapsed or still settling",
 ) -> list[Check]:
     """
     The five things that must be true before the rig leaves the splash screen.
@@ -75,16 +76,14 @@ def build_checks(
             ),
         ),
         Check(
-            # A timer, and named accordingly. ableton/readiness.py calls the result
-            # ASSUMED_READY because there is no load-complete signal until an Ableton
-            # Remote Script exists to send one.
+            # Confidence is the WORST case this check can be, not what it turned out
+            # to be. It passes either because the Ablepad Remote Script confirmed the
+            # set is loaded (which is not a guess at all) or because a timer expired
+            # (which is nothing but). The detail string says which, and it must --
+            # reporting "a guess" after a real confirmation is the same class of lie
+            # the readiness signal was built to stop telling.
             name="settled",
             confidence=Confidence.GUESS,
-            probe=lambda: CheckResult(
-                ableton_settled(),
-                "settle time elapsed (a guess, not a confirmation)"
-                if ableton_settled()
-                else "still settling",
-            ),
+            probe=lambda: CheckResult(ableton_settled(), settled_detail()),
         ),
     ]

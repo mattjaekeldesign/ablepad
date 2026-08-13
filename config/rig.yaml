@@ -17,7 +17,17 @@ rig:
                           # this. The hook that writes it is UNVERIFIED, so an early
                           # signal must not be able to complete boot sooner than a
                           # time we are willing to defend. Measure before lowering.
-  boot_settle_s: 25      # Still a guess, now with one measurement against it:
+  boot_settle_s: 25      # NOW A FALLBACK, not the normal path. With the Ablepad
+                         # Remote Script installed, boot completes on Live's own
+                         # confirmation instead -- MEASURED 2026-08-13: 5.03 s from
+                         # launch to boot complete, against 25 s before, and the 5 s
+                         # was boot_floor_s rather than the signal being slow.
+                         # A boot that takes the full 25 s again means the signal
+                         # stopped arriving: check the Remote Script survived a Live
+                         # update (tools/install-remote-script.ps1). The boot log
+                         # names which of the two paths was taken.
+                         #
+                         # Still a guess, now with one measurement against it:
                          # MEASURED 2026-08-13, the emergency set had Ableton bound
                          # to the EVO's ASIO driver 4.1 s after launch, so 21 s of
                          # this was dead wait. DO NOT lower it to match -- that set

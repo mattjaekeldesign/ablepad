@@ -182,15 +182,69 @@ is a performance controller, so:
 ## 8. Bench verification checklist (before any design hardens)
 
 ```text
-□ Ampero connected USB-C to a computer — Windows MIDI port name recorded
-□ USB MIDI works WITHOUT the Hotone ASIO driver installed (or record that it does not)
-□ Footswitch MIDI arrives over USB (not just TRS OUT) ← KILLS OR CONFIRMS THE DESIGN
-□ Footswitch sends on press (not release); double-press inter-message gap measured
+■ Ampero connected USB-C — port names recorded            DONE 2026-08-12
+■ USB MIDI works WITHOUT the Hotone driver                DONE — class-compliant
+◐ Footswitch MIDI arrives over USB                        NO CC/PC SEEN — see below
+□ Footswitch sends on press (not release); double-press gap measured
 □ Patch MIDI burst (6 messages) arrives intact and in order
 □ TRS MIDI type (A/B) read from the p.15 wiring diagram or verified with a meter
 □ Ampero analog out → EVO 8 line in produces audio in Ableton
 □ Power-on patch behaviour recorded (POWER-ON option, manual p.62)
 ```
+
+### Bench run 1 — 2026-08-12, Beelink RIG
+
+**Enumeration.** Two separate USB devices, not one composite:
+
+```text
+VID_84EF:PID_0053   'Ampero II Stage MIDI'    Status OK      <- class-compliant
+VID_84EF:PID_0052   'Ampero II Stage Audio'   Status Error
+VID_84EF:PID_0052   'Hotone Audio DFU'        Status Error
+```
+
+MIDI port names, verbatim: `'Ampero II Stage MIDI 0'` (in), `'Ampero II Stage MIDI 1'` (out).
+
+**No Hotone driver package is installed and the MIDI port still works.** That is the
+answer to checkbox 2 and it is the good outcome: §12 of CLAUDE.md wants that driver
+kept off the rig, because Ableton binds one ASIO device and it must be the EVO 8. The
+`Error` status on the Audio and DFU interfaces means "no driver bound", which is the
+intended state, not a fault.
+
+**The important result: 60 s of footswitch pressing produced ZERO CC and ZERO PC
+over USB.** Ten messages arrived, all SysEx, all beginning:
+
+```text
+21 25 4D 50 …    ASCII "!%MP"
+```
+
+That is Hotone's proprietary editor/librarian protocol — the channel their PC editor
+uses to read and write patches. It is undocumented, it is not performance MIDI, and
+nothing should be built on it.
+
+> ### What this does and does not prove
+>
+> It shows the USB port carries **no CC/PC as the unit is currently configured**. It
+> does **not** yet prove the hardware cannot send them, because two very different
+> causes produce the same empty capture:
+>
+> 1. the Ampero routes footswitch MIDI to **TRS OUT only** — which is what the manual
+>    documents, and would confirm the design-killing case; or
+> 2. **no footswitch MIDI assignments exist in the unit yet**, so nothing is being
+>    sent anywhere, over any transport.
+>
+> These are distinguished on the device, not from the host: open the Ampero's MIDI
+> settings, confirm footswitches have CC assignments, and confirm MIDI OUT is not set
+> to TRS-only. Re-run the capture afterwards.
+>
+> **If it turns out to be case 1**, the second-controller design needs a TRS-to-USB
+> MIDI interface as mandatory hardware, and that is a purchase, not a code change.
+> Phase 8's Bome question then also changes shape: Bome would be routing a *third*
+> physical port rather than fanning out one.
+
+**Sysex bursts were still informative.** Gaps of 48 ms and 51 ms between paired
+messages, and one pair 394 ms apart, suggest the unit reports state changes promptly
+and that a double-press is resolvable in time terms — if the messages were ever
+usable ones.
 
 ---
 

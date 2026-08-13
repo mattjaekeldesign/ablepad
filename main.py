@@ -23,9 +23,14 @@ import sys
 import time
 from pathlib import Path
 
+from launchpad.backend_mido import MidoBackend
+from launchpad.mappings import load_library
+from launchpad.modes import missing_configs
+from launchpad.service import LaunchpadService
+from launchpad.surface import Surface
 from rig.commands import CommandDispatcher
 from rig.controller import RigController
-from rig.events import EventBus
+from rig.events import ActionRequested, EventBus
 from rig.exceptions import ConfigError
 from rig.state import StateMachine
 from storage.config_loader import RigConfig, load_config
@@ -48,20 +53,51 @@ def setup_logging(config: RigConfig) -> None:
     )
 
 
-def build(config: RigConfig) -> RigController:
+def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
+    """
+    Wire everything. No behaviour here — if a line does more than connect two
+    objects it belongs in the module that owns the behaviour.
+    """
     bus = EventBus()
     machine = StateMachine(bus=bus)
     dispatcher = CommandDispatcher()
-    # Commands register here as later phases add them. Empty in Phase 2 —
-    # and dispatch of anything therefore fails loudly, which is correct.
+    # Commands register here as later phases add them. Empty still — and dispatch of
+    # anything therefore fails loudly, which is correct.
     _ = dispatcher
-    return RigController(
+
+    library, warnings = load_library(root / "configs", root / "animations")
+    # Every RigState must have a surface BEFORE the loop starts. Discovered here it
+    # is a line in the log while a monitor is attached; discovered on a mode switch
+    # it is a black surface halfway through a set.
+    if missing := missing_configs(library):
+        raise ConfigError([f"no config for mode(s): {', '.join(missing)}"])
+    if warnings:
+        log.warning("%d library warning(s) — see above", len(warnings))
+
+    service = LaunchpadService(
+        backend=MidoBackend(),
+        bus=bus,
+        brightness=config.launchpad.brightness,
+    )
+    surface = Surface(service=service, library=library, machine=machine, bus=bus)
+
+    # Until the dispatcher has commands registered, log what the surface resolves.
+    # This is the Phase 3 exit criterion made visible: a press must arrive as a
+    # named action, never as a note number.
+    bus.subscribe(
+        ActionRequested,
+        lambda e: log.info("ACTION %s from pad %d params=%s", e.action, e.pad, e.params),
+    )
+
+    controller = RigController(
         machine=machine,
         bus=bus,
         tick_hz=config.rig.tick_hz,
         clock=time.monotonic,
         sleep=time.sleep,
+        on_tick=[lambda: surface.tick(time.monotonic() * 1000.0)],
     )
+    return controller, surface
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -90,9 +126,15 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(config)
     log.info("config accepted: rig=%r tick_hz=%d", config.rig.name, config.rig.tick_hz)
 
-    controller = build(config)
+    try:
+        controller, surface = build(config, Path(__file__).parent)
+    except ConfigError as exc:
+        log.error("REFUSING TO START — %s", exc)
+        return 2
+
     try:
         controller.run(max_ticks=args.max_ticks)
+        return 0
     except KeyboardInterrupt:
         controller.stop("Ctrl+C")
         log.info("clean exit on Ctrl+C after %d ticks", controller.ticks)
@@ -100,7 +142,11 @@ def main(argv: list[str] | None = None) -> int:
     except Exception:
         log.exception("controller crashed — this is a bug")
         return 1
-    return 0
+    finally:
+        # NON-NEGOTIABLE. Programmer Mode disables the Launchpad's Setup menu, so a
+        # controller that exits without restoring Live Mode leaves a headless rig
+        # with an unreachable front panel. finally, not a happy path.
+        surface.service.close()
 
 
 if __name__ == "__main__":

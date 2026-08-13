@@ -44,10 +44,15 @@ class RigController:
     tick_hz: int
     clock: Callable[[], float]
     sleep: Callable[[float], None]
+    #: Called in order, once per tick, after the Tick event is published. Kept as
+    #: plain callables so the controller knows nothing about Launchpads, set
+    #: browsers or Ableton — it owns pacing and state, and nothing else.
+    on_tick: list[Callable[[], None]] = field(default_factory=list)
 
     _running: bool = field(default=False, init=False)
     _ticks: int = field(default=0, init=False)
     _overruns: int = field(default=0, init=False)
+    _hook_errors: int = field(default=0, init=False)
 
     def run(self, max_ticks: int | None = None) -> int:
         """
@@ -93,6 +98,18 @@ class RigController:
     def overruns(self) -> int:
         return self._overruns
 
+    @property
+    def hook_errors(self) -> int:
+        return self._hook_errors
+
     def _tick(self) -> None:
         self._ticks += 1
         self.bus.publish(Tick(self._ticks))
+        for hook in self.on_tick:
+            try:
+                hook()
+            except Exception:  # noqa: BLE001
+                # A service that throws must not take the rig down with it. The
+                # show keeps running; the log carries the stack trace.
+                self._hook_errors += 1
+                log.exception("tick hook raised (%d so far) — continuing", self._hook_errors)

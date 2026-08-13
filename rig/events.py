@@ -44,6 +44,40 @@ class PadEvent(Event):
 
 
 @dataclass(frozen=True)
+class ActionRequested(Event):
+    """
+    A pad press resolved to a NAMED ACTION. Phase 3's exit test in one event type:
+    nothing downstream should ever see a note number.
+
+    Published only once the action's hold requirement is satisfied, so a subscriber
+    can act immediately — LOAD_SET arriving means the pad really was held for two
+    seconds, not tapped.
+    """
+
+    action: str  # one of mappings.ACTION_TYPES
+    params: dict
+    pad: int  # kept for logging and LED feedback, not for dispatch
+
+
+@dataclass(frozen=True)
+class ActionArmed(Event):
+    """A hold started. The surface shows feedback; nothing else need care."""
+
+    action: str
+    pad: int
+    hold_ms: int
+
+
+@dataclass(frozen=True)
+class ActionCancelled(Event):
+    """A hold was released early. The action did NOT happen."""
+
+    action: str
+    pad: int
+    held_ms: float
+
+
+@dataclass(frozen=True)
 class StateChanged(Event):
     """The rig moved between modes. Published by StateMachine, never manually."""
 

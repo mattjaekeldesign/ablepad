@@ -318,23 +318,28 @@ launchpad/
 □ Animation can be cancelled mid-run
 ```
 
-**STATUS: MODULES COMPLETE, NEVER RUN ON THE DEVICE.**
+**STATUS: BUILT AND WIRED. The rig boots and drives a surface.**
 
 ```text
-ports.py         name -> USB interface. Pure, no mido.          DONE 2026-08-12
-device.py        open, Programmer Mode, IO, RESTORE             DONE 2026-08-12
-backend_mido.py  the only module importing mido                 DONE 2026-08-12
-renderer.py      state + animation + presses -> 81 LedSpecs     DONE 2026-08-12
-modes.py         RigState -> which surface                      DONE 2026-08-12
-grid.py colors.py                                MEASURED on hardware, Phase 1
-mappings.py animations.py player.py              ported from the Config Lab
+ports.py         name -> USB interface. Pure.                    DONE 2026-08-12
+device.py        open, Programmer Mode, IO, RESTORE              DONE 2026-08-12
+backend_mido.py  the only module importing mido                  DONE 2026-08-12
+renderer.py      state + animation + presses -> 81 LedSpecs      DONE 2026-08-12
+modes.py         RigState -> which surface                       DONE 2026-08-12
+service.py       owns the connection, survives losing it         DONE 2026-08-13
+surface.py       the bridge: modes, animations, hold-to-confirm  DONE 2026-08-13
+main.py          wired; controller gained on_tick hooks          DONE 2026-08-13
 ```
 
-53 new tests, 427 passing, all off-rig behind a fake MIDI backend.
+`python main.py` loads the library, refuses to start if any RigState lacks a surface,
+arms the boot intro, and ticks at 30 Hz. With no device attached it logs the loss once
+and keeps running — verified off-rig.
 
-**What is NOT done is the part that needs the Beelink.** Nothing in `launchpad/` has
-ever opened a real port — every byte this project has sent came from `tools/`. The
-checklist below is the exit test and none of it has run.
+**PROVEN ON HARDWARE 2026-08-12:** connect, identify (firmware 0351), Programmer Mode,
+a full-surface paint, and — through an unplanned crash — restore-to-Live-mode holding
+after an unhandled exception, confirmed by reading the mode back off the device.
+
+**NOT proven on hardware:** everything below. All twenty replug cycles were simulated.
 
 **Risk: Medium.** The reconnect + SysEx path is the single most common way this rig dies on
 stage. Test it 20 times, not twice.

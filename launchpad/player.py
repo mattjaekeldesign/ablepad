@@ -88,6 +88,15 @@ class AnimationPlayer:
             self._finish("cancelled")
 
     @property
+    def mode(self) -> PlayMode:
+        """
+        INTRO or DURING. Public because the compositor needs it: an intro COVERS the
+        surface and a during-loop composites under or over it, and that is the
+        caller's decision to make, not something to infer from a private field.
+        """
+        return self._mode
+
+    @property
     def is_playing(self) -> bool:
         return self._anim is not None
 

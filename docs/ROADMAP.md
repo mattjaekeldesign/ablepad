@@ -125,7 +125,8 @@ BUILD ORDER
 ├── Phase 5  Ableton launcher   — launch, supervise, recover
 ├── Phase 6  Lifeline           — hotspot + SSH  ← BEFORE going headless
 ├── Phase 7  Headless boot      — task scheduler, cold-boot test
-├── Phase 8  Performance layer  — Bome decision lands here
+├── Phase 8  Performance layer  — Bome decision + Ampero, both blocked on a
+│                              TRS-to-USB MIDI interface (see hotone reference)
 └── Phase 9  Hardening          — rehearsal, failure injection, system image
 ```
 

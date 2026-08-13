@@ -104,6 +104,8 @@ class Surface:
     on_released_tick: "Callable[[float], None] | None" = None
 
     _last_state: RigState | None = field(default=None, init=False)
+    #: Most recent tick time, so intro_playing can be asked outside the tick.
+    _last_frame_ms: float = field(default=0.0, init=False)
     _held: dict[int, Hold] = field(default_factory=dict, init=False)
     _pressed: set[int] = field(default_factory=set, init=False)
 
@@ -111,6 +113,7 @@ class Surface:
 
     def tick(self, now_ms: float) -> None:
         """One frame. Never raises: the service swallows device faults already."""
+        self._last_frame_ms = now_ms
         if not self._own_surface():
             self._listen_while_released(now_ms)
             return
@@ -283,6 +286,21 @@ class Surface:
         self.bus.publish(ActionRequested(action=action, params=dict(params), pad=pad))
 
     # -- introspection ----------------------------------------------------
+
+    @property
+    def intro_playing(self) -> bool:
+        """
+        Is a mode's intro animation still running?
+
+        Used by the boot choice window so the Set Browser does not replace Boot
+        Mode's rain a third of a second after power-on. With everything already
+        attached the rig is ready almost instantly, and a splash nobody sees is not
+        a splash -- "i wanted the rain animation before the bank because then i know
+        when its truly ready to launch live".
+        """
+        return self.player.mode is PlayMode.INTRO and self.player.frame(
+            self._last_frame_ms
+        ) is not None
 
     @property
     def holding(self) -> dict[int, Hold]:

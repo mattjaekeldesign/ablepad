@@ -46,7 +46,7 @@
         "params": {
           "slot": 8
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "72": {
@@ -70,7 +70,7 @@
         "params": {
           "slot": 9
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "73": {
@@ -94,7 +94,7 @@
         "params": {
           "slot": 10
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "74": {
@@ -118,7 +118,7 @@
         "params": {
           "slot": 11
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "75": {
@@ -142,7 +142,7 @@
         "params": {
           "slot": 12
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "76": {
@@ -166,7 +166,7 @@
         "params": {
           "slot": 13
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "77": {
@@ -190,7 +190,7 @@
         "params": {
           "slot": 14
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "78": {
@@ -214,7 +214,7 @@
         "params": {
           "slot": 15
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "81": {
@@ -238,7 +238,7 @@
         "params": {
           "slot": 0
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "82": {
@@ -262,7 +262,7 @@
         "params": {
           "slot": 1
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "83": {
@@ -286,7 +286,7 @@
         "params": {
           "slot": 2
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "84": {
@@ -310,7 +310,7 @@
         "params": {
           "slot": 3
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "85": {
@@ -334,7 +334,7 @@
         "params": {
           "slot": 4
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "86": {
@@ -358,7 +358,7 @@
         "params": {
           "slot": 5
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "87": {
@@ -382,7 +382,7 @@
         "params": {
           "slot": 6
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "88": {
@@ -406,7 +406,7 @@
         "params": {
           "slot": 7
         },
-        "hold_ms": 2000
+        "hold_ms": 1000
       }
     },
     "91": {
@@ -470,7 +470,7 @@
       "to": "performance"
     }
   ],
-  "notes": "The 16 slots here are demo placeholders — real slot count, names and colours come from the Phase 4 scanner plus sets.yaml, and pages beyond 16 arrive via the Prev/Next CCs. The top-row and right-column CC numbers are still UNVERIFIED hardware truth.",
+  "notes": "The 16 slots here are demo placeholders \u2014 real slot count, names and colours come from the Phase 4 scanner plus sets.yaml, and pages beyond 16 arrive via the Prev/Next CCs. The top-row and right-column CC numbers are still UNVERIFIED hardware truth.",
   "meta": {
     "flowPos": {
       "x": 374,

@@ -214,4 +214,8 @@ def test_load_set_hold_default_applied(tmp_path):
     write_json(tmp_path / "configs", "holds.json", config)
     library, _ = load_library(tmp_path / "configs", tmp_path / "animations")
     action = library.modes["holds"].pads[12].action
-    assert action.hold_ms == ACTION_HOLDS["LOAD_SET"] == 2000  # roadmap's 2 s gate
+    # 1000, not the roadmap's original 2000. Changed after using it on hardware:
+    # two seconds is a long time with a finger on a pad. The assertion is against
+    # the table rather than a literal so the two cannot drift, and the literal is
+    # here so a change is a decision rather than a test quietly following along.
+    assert action.hold_ms == ACTION_HOLDS["LOAD_SET"] == 1000

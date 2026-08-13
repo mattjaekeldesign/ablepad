@@ -104,3 +104,58 @@ def test_require_choice_still_ends_the_moment_a_set_is_chosen():
     bus.publish(ActionRequested(action="LOAD_SET", params={"slot": 0}, pad=81))
     assert choice.waiting(now[0]) is False
     assert choice.chosen is True
+
+
+def test_the_bank_is_not_shown_until_the_rig_could_act_on_it():
+    # OBSERVED: the bank appeared before the Launchpad and interface were confirmed,
+    # so pressing a pad did nothing. A surface offering choices it cannot honour is
+    # worse than one that plainly says "not yet" -- which is what Boot Mode's
+    # animation is for.
+    now = [0.0]
+    bus = EventBus()
+    machine = StateMachine(bus=bus)
+    ready = {"v": False}
+    choice = BootChoice(seconds=8.0, clock=lambda: now[0], machine=machine, bus=bus,
+                        ready=lambda: ready["v"])
+
+    for _ in range(5):
+        now[0] += 1
+        assert choice.waiting(now[0]) is True
+        assert machine.state is RigState.BOOT, "must still be showing Boot Mode"
+
+    ready["v"] = True
+    assert choice.waiting(now[0]) is True
+    assert machine.state is RigState.SET_BROWSER, "bank appears once it can be acted on"
+
+
+def test_the_choice_window_starts_when_the_bank_appears_not_at_power_on():
+    # Otherwise a slow-to-enumerate interface eats the window, and the default loads
+    # before anyone has seen a pad light up.
+    now = [0.0]
+    bus = EventBus()
+    machine = StateMachine(bus=bus)
+    ready = {"v": False}
+    choice = BootChoice(seconds=8.0, clock=lambda: now[0], machine=machine, bus=bus,
+                        ready=lambda: ready["v"])
+    now[0] = 30.0
+    choice.waiting(now[0])          # still not ready; clock has run on
+    ready["v"] = True
+    choice.waiting(now[0])          # bank appears now
+    now[0] = 37.9
+    assert choice.waiting(now[0]) is True, "8s window counts from the bank, not boot"
+    now[0] = 38.1
+    assert choice.waiting(now[0]) is False
+
+
+def test_a_broken_readiness_probe_does_not_strand_boot():
+    now = [0.0]
+    bus = EventBus()
+    machine = StateMachine(bus=bus)
+
+    def boom():
+        raise OSError("registry unavailable")
+
+    choice = BootChoice(seconds=8.0, clock=lambda: now[0], machine=machine, bus=bus,
+                        ready=boom)
+    assert choice.waiting(now[0]) is True
+    assert machine.state is RigState.SET_BROWSER, "fall through rather than stall"

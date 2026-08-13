@@ -57,6 +57,16 @@ class BootChoice:
     #: Wait until a set is chosen rather than loading the default when the window
     #: expires. `seconds` is then only the point at which the log says so.
     require_choice: bool = False
+    #: True when the rig could actually launch a set right now -- Launchpad attached,
+    #: audio interface present. Until it is, the browser is NOT shown and Boot Mode's
+    #: animation keeps playing.
+    #:
+    #: OBSERVED 2026-08-13: without this the bank appeared immediately, before the
+    #: rig could act on it, and pressing a pad did nothing. "this is where i wanted
+    #: the rain animation before the bank because then i know when its truly ready to
+    #: launch live". A surface offering choices it cannot honour is worse than one
+    #: that plainly says "not yet".
+    ready: "Callable[[], bool]" = lambda: True
 
     _started_at: float | None = field(default=None, init=False)
     _done: bool = field(default=False, init=False)
@@ -76,6 +86,13 @@ class BootChoice:
             return False
 
         if self._started_at is None:
+            # Not ready to launch anything yet: stay in Boot Mode, keep its animation
+            # running, and do not offer a choice that cannot be acted on.
+            try:
+                if not self.ready():
+                    return True
+            except Exception:  # noqa: BLE001 -- a broken probe must not stall boot
+                log.exception("readiness check failed — showing the browser anyway")
             self._started_at = now
             try:
                 self.machine.transition(RigState.SET_BROWSER, "BOOT_CHOICE")

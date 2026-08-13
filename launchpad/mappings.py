@@ -55,7 +55,13 @@ ANIM_LAYERS = ("under", "over")
 ACTION_HOLDS: dict[str, int | None] = {
     "NONE": None,
     "SWITCH_MODE": None,
-    "LOAD_SET": 2000,
+    # 1000, not 2000. MEASURED by using it: two seconds is longer than it sounds
+    # with a finger on a pad -- "it works but the hold down is too long". The hold
+    # exists so a set cannot change from a brush, and the handover makes that risk
+    # smaller than it looks: during a performance the surface belongs to Ableton, so
+    # these pads are only live when Ableton is closed or the escape hatch was used.
+    # A second is still unmistakably deliberate.
+    "LOAD_SET": 1000,
     "PAGE_NEXT": None,
     "PAGE_PREV": None,
     "RESCAN_SETS": None,

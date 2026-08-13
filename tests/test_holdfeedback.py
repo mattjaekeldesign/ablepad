@@ -101,3 +101,27 @@ def test_each_held_pad_is_reported_independently():
     leds = hold_leds({11: FakeHold(1000), 81: FakeHold(6000)}, 900)
     assert leds[11]["palette"] == HOLD_RAMP[2]  # nearly there
     assert leds[81]["palette"] == HOLD_RAMP[0]  # barely started
+
+
+def test_hold_progress_beats_the_set_browsers_colour_override():
+    # The exact interaction on the boot screen: the browser paints pad 81 green via
+    # an override, and holding it must still show progress. If the override won, the
+    # busiest pad on the rig would be the one with no feedback.
+    from launchpad.mappings import Action, ModeConfig, PadBinding
+    from launchpad.renderer import render
+
+    pads = {
+        81: PadBinding(pad=81, label="Set 1", led={"idle": {"type": "off"}},
+                       action=Action("LOAD_SET", {"slot": 0}, 2000))
+    }
+    config = ModeConfig(id="set-browser", name="Set Browser", kind="mode",
+                        background={"type": "off"}, pads=pads, animations={}, transitions=())
+
+    override = {81: {"type": "static", "palette": colors.GREEN}}
+    lit = {s.index: s.colour for s in render(config, overrides=override)}
+    assert lit[81] == colors.GREEN, "idle shows the browser's colour"
+
+    held = {81: {"type": "static", "palette": HOLD_RAMP[0]}}
+    lit = {s.index: s.colour for s in render(config, overrides=override,
+                                             pressed={81}, holds=held)}
+    assert lit[81] == HOLD_RAMP[0], "a held pad shows progress, not the override"

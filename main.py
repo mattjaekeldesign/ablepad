@@ -329,12 +329,36 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     launch_state = {"tried": False}
     boot_done = {"v": False}
     gate = build_boot_gate(config, service, machine)
+    def ready_to_choose() -> bool:
+        """
+        Can the rig actually launch a set right now?
+
+        The Launchpad has to be attached (or there is nothing to press) and the audio
+        interface has to be present (or the launcher refuses anyway). Deliberately
+        NOT the full boot gate: Ableton cannot be running yet, because nothing has
+        been chosen to run.
+        """
+        if not service.connected:
+            return False
+        # Let Boot Mode's animation finish. With everything already attached the rig
+        # is ready in a third of a second, and a splash nobody sees is not a splash:
+        # the rain IS the signal that the rig is starting.
+        if surface.intro_playing:
+            return False
+        try:
+            from windows import probes  # noqa: PLC0415 -- platform import
+
+            return bool(probes.usb_device_bound())
+        except Exception:  # noqa: BLE001 -- not on Windows; do not block the browser
+            return True
+
     choice_window = BootChoice(
         seconds=config.rig.boot_choice_s,
         clock=time.monotonic,
         machine=machine,
         bus=bus,
         require_choice=config.rig.boot_requires_choice,
+        ready=ready_to_choose,
     )
 
     def lifeline_tick() -> None:

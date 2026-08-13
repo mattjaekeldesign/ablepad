@@ -1,0 +1,107 @@
+"""
+A few seconds to pick a set before the rig picks one for you.
+
+LAYER: Controller policy. Pure -- injected clock, no device, no process.
+
+WHY IT EXISTS
+    OBSERVED on the first cold boot, 2026-08-13: the rig launched boot_set the
+    instant it started, and by the time a human was looking the surface already
+    belonged to Ableton. So the Set Browser existed at boot and was unreachable at
+    boot -- "ableton auto boots so i never had the chance to choose a set".
+
+WHAT IT DOES, AND WHAT IT REFUSES TO DO
+    Shows the Set Browser for `seconds`, then lets boot carry on and load the
+    default. It does NOT wait for input: an unattended rig powering up in a van must
+    reach a playable state on its own, and a prompt nobody answers is a rig that
+    never starts. The window is a courtesy to a hand that is already there, not a
+    gate.
+
+    Pressing a set during the window cancels it -- the press IS the choice, and
+    counting down afterwards would either load two sets or ignore the one you asked
+    for.
+
+WHY IT SITS IN BOOT AND NOT BEFORE IT
+    The boot gate is already running and already has its own timeout, so a few
+    seconds here comes out of that budget rather than adding to it. Set
+    rig.boot_choice_s to 0 to restore the old behaviour exactly.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from typing import Callable
+
+from rig.events import ActionRequested, EventBus
+from rig.exceptions import IllegalTransition
+from rig.state import RigState, StateMachine
+
+log = logging.getLogger(__name__)
+
+__all__ = ["BootChoice"]
+
+
+@dataclass
+class BootChoice:
+    seconds: float
+    clock: Callable[[], float]
+    machine: StateMachine
+    bus: EventBus
+
+    _started_at: float | None = field(default=None, init=False)
+    _done: bool = field(default=False, init=False)
+
+    def __post_init__(self) -> None:
+        self.bus.subscribe(ActionRequested, self._on_action)
+
+    def waiting(self, now: float) -> bool:
+        """
+        True while boot should hold off launching. Safe to call every tick.
+
+        Also performs the transition into the browser on the first call, because
+        the window is only meaningful if the surface is showing the sets.
+        """
+        if self._done or self.seconds <= 0:
+            return False
+
+        if self._started_at is None:
+            self._started_at = now
+            try:
+                self.machine.transition(RigState.SET_BROWSER, "BOOT_CHOICE")
+            except IllegalTransition as exc:
+                # Not worth stalling boot over. Skip the window and carry on.
+                log.warning("cannot show the browser at boot (%s) — loading the default", exc)
+                self._done = True
+                return False
+            log.info(
+                "%.0fs to choose a set — the default loads on its own if nobody does",
+                self.seconds,
+            )
+            return True
+
+        if now - self._started_at >= self.seconds:
+            log.info("no set chosen — loading the default")
+            self._finish()
+            return False
+        return True
+
+    def _on_action(self, event: ActionRequested) -> None:
+        if event.action == "LOAD_SET" and not self._done:
+            # The press IS the choice. Counting down afterwards would either load two
+            # sets or ignore the one that was asked for.
+            log.info("set chosen during the boot window — cancelling the default")
+            self._finish(chosen=True)
+
+    def _finish(self, chosen: bool = False) -> None:
+        """
+        Close the window. Deliberately does NOT move the rig back to BOOT.
+
+        SET_BROWSER -> BOOT is not in the transition table and should not be: going
+        backwards is not a thing this rig does. Nothing needs it either -- the boot
+        gate is latched rather than keyed on state, so it keeps evaluating from
+        wherever we are, and the handover rules take the surface once Ableton is up.
+        """
+        self._done = True
+        self.chosen = chosen
+
+    chosen: bool = field(default=False, init=False)

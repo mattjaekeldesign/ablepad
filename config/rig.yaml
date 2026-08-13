@@ -13,6 +13,13 @@ rig:
   tick_hz: 30            # MEASURED 2026-08-12: 899 consecutive ticks, zero overruns,
                          # each one rendering and pushing all 81 LEDs on the Beelink
   boot_timeout_s: 90     # how long the boot gate waits before showing Error Mode
+  boot_choice_s: 8      # Seconds of Set Browser before the default set loads itself.
+                        # OBSERVED on the first cold boot 2026-08-13: the rig
+                        # launched boot_set instantly and by the time a human was
+                        # looking the surface already belonged to Ableton, so the
+                        # browser existed at boot and was unreachable at boot.
+                        # It does NOT wait for input -- a rig powering up in a van
+                        # must reach a playable state with nobody there. 0 = off.
   boot_floor_s: 8        # FLOOR, measured from launch. A Remote Script readiness
                          # signal is ignored until this has passed.
                          # MEASURED 2026-08-13 on test.als (Gateway with a NAM model

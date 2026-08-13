@@ -46,6 +46,11 @@ class RigSection:
     #: complete boot earlier than the timer it replaces, which is worse than the
     #: guess. Only lower this once the real gap has been measured.
     boot_floor_s: float = 5.0
+    #: Seconds of Set Browser at startup before the default set loads by itself.
+    #: 0 restores the old behaviour (launch immediately). This is a courtesy to a
+    #: hand that is already there, never a gate: an unattended rig powering up in a
+    #: van must still reach a playable state on its own.
+    boot_choice_s: float = 8.0
 
 
 @dataclass(frozen=True)
@@ -163,6 +168,7 @@ def load_config(path: Path) -> RigConfig:
     boot_timeout_s = rig_raw.get("boot_timeout_s", 90.0)
     boot_settle_s = rig_raw.get("boot_settle_s", 25.0)
     boot_floor_s = rig_raw.get("boot_floor_s", 5.0)
+    boot_choice_s = rig_raw.get("boot_choice_s", 8.0)
     if isinstance(tick_hz, int) and not 1 <= tick_hz <= 200:
         problems.append(f"rig.tick_hz must be 1-200, got {tick_hz}")
 
@@ -209,7 +215,7 @@ def load_config(path: Path) -> RigConfig:
         rig=RigSection(
             name=str(name), tick_hz=int(tick_hz),
             boot_timeout_s=float(boot_timeout_s), boot_settle_s=float(boot_settle_s),
-            boot_floor_s=float(boot_floor_s),
+            boot_floor_s=float(boot_floor_s), boot_choice_s=float(boot_choice_s),
         ),  # type: ignore[arg-type]
         launchpad=LaunchpadSection(
             brightness=int(brightness), port_contains=str(port_contains),  # type: ignore[arg-type]

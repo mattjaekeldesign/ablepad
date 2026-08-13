@@ -36,6 +36,7 @@ from launchpad.modes import missing_configs
 from launchpad.service import LaunchpadService
 from launchpad.surface import Surface
 from rig.boot import BootGate, BootOutcome
+from rig.boot_choice import BootChoice
 from rig.browser_control import SetBrowserControl
 from rig.boot_checks import build_checks
 from rig.commands import CommandDispatcher
@@ -116,7 +117,23 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     ownership = SurfaceOwner(enabled=config.launchpad.handover_to_ableton)
 
     def ableton_ready() -> bool:
-        return supervisor is not None and supervisor.launcher.is_running()
+        """
+        Ready, not merely RUNNING.
+
+        OBSERVED 2026-08-13: keyed on is_running() alone, the rig handed the surface
+        over 9 ms after launching Ableton and then sat dark for the 25 s Live took to
+        load -- "theres no signaling making me aware that its booting". The surface
+        belonged to a Live that could not paint it yet, which is the worst of both:
+        the rig has stopped showing anything and Ableton has not started.
+
+        Gating on the boot gate means the rig keeps the surface, and its animation,
+        until Live can actually drive it.
+        """
+        return (
+            boot_done["v"]
+            and supervisor is not None
+            and supervisor.launcher.is_running()
+        )
 
     surface.rig_owns_surface = lambda: ownership.rig_owns(machine.state, ableton_ready())
 
@@ -310,7 +327,14 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
             log.error("not launching Ableton: %s", "; ".join(exc.reasons))
 
     launch_state = {"tried": False}
+    boot_done = {"v": False}
     gate = build_boot_gate(config, service, machine)
+    choice_window = BootChoice(
+        seconds=config.rig.boot_choice_s,
+        clock=time.monotonic,
+        machine=machine,
+        bus=bus,
+    )
 
     def lifeline_tick() -> None:
         """Cheap every tick; the lifeline rate-limits itself to its retry interval."""
@@ -324,13 +348,32 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         BOOT is the one state with an automatic exit. Everything else moves because
         a human pressed something.
         """
-        if machine.state is not RigState.BOOT:
+        # Latched, NOT keyed on state being BOOT. The choice window moves the rig to
+        # SET_BROWSER so the sets are visible, and a state check here would then
+        # early-return forever and never launch anything at all.
+        if boot_done["v"]:
             return
+
+        # A window to choose a set BEFORE anything is launched.
+        #
+        # Without it the rig launches boot_set the instant it starts, and by the
+        # time a human is looking the surface already belongs to Ableton -- so the
+        # Set Browser exists and is never reachable at boot, which is exactly what
+        # Matt hit on the first cold boot. The default still loads, so an unattended
+        # rig behaves as before; this only buys a few seconds for a hand that is
+        # already there.
+        if choice_window.waiting(time.monotonic()):
+            return
+
         start_ableton_once()
         outcome = gate.evaluate()
         if outcome is BootOutcome.COMPLETE:
-            machine.transition(RigState.SET_BROWSER, "BOOT_COMPLETE")
+            boot_done["v"] = True
+            if machine.state is RigState.BOOT:
+                machine.transition(RigState.SET_BROWSER, "BOOT_COMPLETE")
+            return
         elif outcome is BootOutcome.FAILED:
+            boot_done["v"] = True
             # Error Mode, naming the fault. On a screenless rig "EVO 8 not on the USB
             # bus" and "Ableton not running" need different hands doing different
             # things, and a plain red screen tells you neither.

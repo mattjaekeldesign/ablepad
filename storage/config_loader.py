@@ -68,6 +68,15 @@ class AbletonSection:
     restart_attempts: int = 1
     #: How long a run must survive before that one restart is earned back.
     restart_stable_s: float = 120.0
+    #: %APPDATA%\\Ableton -- the folder holding the versioned "Live 12.4.3" dirs.
+    #: Empty disables the crash-journal sweep, and the recovery dialog becomes
+    #: possible again. Not derived from the environment because the rig runs as a
+    #: scheduled task, where %APPDATA% is whatever the task's user has.
+    appdata_dir: str = ""
+    #: Where swept crash journals go. They are MOVED, never deleted, because this
+    #: machine also builds sets and a journal can hold genuinely unsaved work.
+    crash_quarantine_dir: str = ""
+
 
 
 @dataclass(frozen=True)
@@ -150,6 +159,8 @@ def load_config(path: Path) -> RigConfig:
     restart_attempts = ableton_raw.get("restart_attempts", 1)
     restart_stable_s = ableton_raw.get("restart_stable_s", 120.0)
     sets_dir = want(ableton_raw, "ableton", "sets_dir", str)
+    appdata_dir = ableton_raw.get("appdata_dir", "")
+    crash_quarantine_dir = ableton_raw.get("crash_quarantine_dir", "")
 
     log_raw = section("logging")
     log_dir = want(log_raw, "logging", "dir", str)
@@ -174,6 +185,7 @@ def load_config(path: Path) -> RigConfig:
         ableton=AbletonSection(
             exe=str(exe), sets_dir=str(sets_dir), boot_set=str(boot_set),
             restart_attempts=int(restart_attempts), restart_stable_s=float(restart_stable_s),
+            appdata_dir=str(appdata_dir), crash_quarantine_dir=str(crash_quarantine_dir),
         ),
         logging=LoggingSection(dir=str(log_dir), level=str(level)),
     )

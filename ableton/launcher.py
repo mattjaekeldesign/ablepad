@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from ableton.crash_recovery import CrashRecovery
 from ableton.process import ProcessController, ProcessHandle
 from rig.exceptions import RigError
 
@@ -50,6 +51,10 @@ class AbletonLauncher:
     exe: Path
     processes: ProcessController
     audio: AudioInterfacePresence
+    #: Clears Live's crash journal so the "recover the last session?" dialog never
+    #: appears -- unanswerable on a rig with no keyboard. Optional: absent means the
+    #: dialog is possible, not that anything breaks.
+    recovery: CrashRecovery | None = None
 
     _handle: ProcessHandle | None = field(default=None, init=False)
 
@@ -71,6 +76,11 @@ class AbletonLauncher:
         if reasons:
             log.error("refusing to launch: %s", "; ".join(reasons))
             raise LaunchRefused(reasons)
+        if self.recovery is not None:
+            # Here and nowhere else: preconditions have passed, so a launch is
+            # definitely happening, and Live is definitely not running yet -- the one
+            # moment when every journal on disk is stale rather than in use.
+            self.recovery.clear()
         self._handle = self.processes.start(self.exe, live_set)
         return self._handle
 

@@ -23,6 +23,7 @@ import sys
 import time
 from pathlib import Path
 
+from ableton.crash_recovery import CrashRecovery
 from ableton.launcher import AbletonLauncher, LaunchRefused
 from ableton.process import PsutilProcessController
 from ableton.readiness import Readiness, ReadinessTracker
@@ -212,10 +213,31 @@ def build_ableton(config: RigConfig, bus: EventBus) -> AbletonSupervisor | None:
         )
         return None
 
+    recovery = None
+    if config.ableton.appdata_dir and config.ableton.crash_quarantine_dir:
+        recovery = CrashRecovery(
+            ableton_appdata=Path(config.ableton.appdata_dir),
+            quarantine=Path(config.ableton.crash_quarantine_dir),
+        )
+        pending = len(recovery.pending())
+        if pending:
+            log.info(
+                "%d Live crash journal(s) waiting — they will be moved aside before "
+                "launch so the recovery dialog cannot block a headless boot",
+                pending,
+            )
+    else:
+        log.warning(
+            "no ableton.appdata_dir/crash_quarantine_dir configured — Live may show "
+            "its 'recover the last session?' dialog, which nothing can answer on a rig "
+            "with no keyboard"
+        )
+
     launcher = AbletonLauncher(
         exe=Path(config.ableton.exe),
         processes=PsutilProcessController(),
         audio=EvoPresence(),
+        recovery=recovery,
     )
     budget = RestartBudget(
         # ONE automatic restart. A restart that crashes again quickly means something

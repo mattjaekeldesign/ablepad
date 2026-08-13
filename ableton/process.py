@@ -71,17 +71,80 @@ class PsutilProcessController:
             return False
 
     def terminate_gracefully(self, handle: ProcessHandle, timeout_s: float) -> bool:
+        """
+        Ask Live to close. True if it exited within the timeout.
+
+        MEASURED 2026-08-13: psutil.terminate() is NOT graceful on Windows. It calls
+        TerminateProcess, the same syscall as kill(), so the old implementation of
+        this method was a hard kill wearing a polite name. Live therefore never ran
+        its shutdown, never removed its crash journal, and offered to recover the
+        session on every single launch -- including after an ordinary set switch,
+        because SetBrowserControl stops Live before loading.
+
+        `taskkill /PID n` WITHOUT /F posts WM_CLOSE to the process's windows, which
+        is the only close request Windows offers without writing window-message code
+        of our own. That is what makes the exit clean.
+
+        THE HANG THIS CAN CAUSE, AND WHY IT IS STILL RIGHT
+            A close request on a set with unsaved changes raises Live's "save
+            changes?" prompt, and nothing headless will ever answer it. That run
+            burns the full timeout and then gets killed -- exactly the old
+            behaviour, no worse. Performance sets are not edited, so the prompt
+            should not appear; if these timeouts show up in the log, something is
+            modifying sets at runtime and that is the bug to chase.
+        """
         import psutil
 
         try:
             process = psutil.Process(handle.pid)
-            process.terminate()
+        except psutil.NoSuchProcess:
+            return True  # already gone counts as success
+
+        if not self._request_close(handle.pid):
+            # No taskkill (not Windows, or not on PATH). Fall back to psutil, which
+            # is graceful on POSIX and a kill on Windows -- the old behaviour, kept
+            # so a non-Windows host is not left with no way to stop a process.
+            try:
+                process.terminate()
+            except psutil.NoSuchProcess:
+                return True
+
+        try:
             process.wait(timeout=timeout_s)
             return True
         except psutil.NoSuchProcess:
-            return True  # already gone counts as success
+            return True
         except psutil.TimeoutExpired:
             return False
+
+    @staticmethod
+    def _request_close(pid: int) -> bool:
+        """
+        Post WM_CLOSE via taskkill. Returns whether the request was delivered.
+
+        False means "could not ask" (no taskkill), NOT "the process refused" --
+        taskkill returns promptly once the message is posted, long before Live has
+        finished shutting down. Whether it worked is decided by the wait() above.
+        """
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                ["taskkill", "/PID", str(pid)],
+                capture_output=True,
+                timeout=10,
+            )
+        except (FileNotFoundError, OSError, subprocess.TimeoutExpired) as exc:
+            log.debug("taskkill unavailable for pid %d (%s) — falling back", pid, exc)
+            return False
+        if result.returncode != 0:
+            log.debug(
+                "taskkill declined pid %d (rc=%d): %s",
+                pid, result.returncode, result.stderr.decode(errors="replace").strip(),
+            )
+            return False
+        log.info("asked Ableton (pid %d) to close", pid)
+        return True
 
     def kill(self, handle: ProcessHandle) -> None:
         import psutil

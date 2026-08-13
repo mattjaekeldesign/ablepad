@@ -54,6 +54,20 @@ ableton:
   # folder, so the .als is one level deeper than where you saved it.
   boot_set: "C:\\LiveRig\\Sets\\Candidate\\test Project\\test.als"
 
+  # Live's crash journal. MEASURED 2026-08-13 (Live 12.4.3): every run writes
+  # <appdata>\Live <version>\Preferences\Crash\<stamp>_{BaseFiles,Undo}, and a
+  # clean exit removes it. One left behind at startup is what makes Live ask
+  # "recover the last session?" -- a modal dialog, and the rig has no keyboard.
+  #
+  # The version segment is globbed, so a Live update does not silently break this.
+  # Journals are MOVED to the quarantine below, never deleted: this machine also
+  # builds sets, and a journal can hold the only copy of unsaved work.
+  #
+  # Set to the user the scheduled task runs as. NOT read from %APPDATA% at runtime,
+  # because that resolves against whoever launched the process.
+  appdata_dir: "C:\\Users\\rigma\\AppData\\Roaming\\Ableton"
+  crash_quarantine_dir: "C:\\LiveRig\\Logs\\crash-quarantine"
+
 logging:
   dir: "logs"
   level: "INFO"

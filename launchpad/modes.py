@@ -33,7 +33,15 @@ from enum import Enum
 from launchpad.mappings import ConfigLibrary, ModeConfig
 from rig.state import RigState
 
-__all__ = ["LaunchpadMode", "mode_for", "config_id_for", "resolve", "missing_configs", "ModeError"]
+__all__ = [
+    "LaunchpadMode",
+    "mode_for",
+    "config_id_for",
+    "state_for",
+    "resolve",
+    "missing_configs",
+    "ModeError",
+]
 
 
 class LaunchpadMode(Enum):
@@ -83,6 +91,36 @@ def mode_for(state: RigState) -> LaunchpadMode | None:
 def config_id_for(state: RigState) -> str | None:
     mode = mode_for(state)
     return mode.value if mode else None
+
+
+#: The reverse binding, DERIVED rather than written out. A second hand-maintained
+#: table would be free to disagree with the first, and the disagreement would show up
+#: as a pad that switches to a mode the surface does not then paint. Built here so the
+#: forward table stays the single source of truth.
+_STATE_FOR_MODE: dict[LaunchpadMode, RigState] = {
+    mode: state for state, mode in _MODE_FOR_STATE.items() if mode is not None
+}
+
+
+def state_for(config_id: str) -> RigState:
+    """
+    The RigState a config id names — what a SWITCH_MODE pad is asking for.
+
+    Raises rather than guessing. A SWITCH_MODE whose target is not a real mode is a
+    config bug, and mappings.py already refuses to load a library containing one; if
+    it somehow arrives here, saying so beats moving the rig to an arbitrary state.
+    """
+    try:
+        mode = LaunchpadMode(config_id)
+    except ValueError:
+        raise ModeError(
+            f"{config_id!r} is not a Launchpad mode. Known: "
+            f"{sorted(m.value for m in LaunchpadMode)}."
+        ) from None
+    state = _STATE_FOR_MODE.get(mode)
+    if state is None:
+        raise ModeError(f"mode {config_id!r} has no rig state to switch to")
+    return state
 
 
 def missing_configs(library: ConfigLibrary) -> list[str]:

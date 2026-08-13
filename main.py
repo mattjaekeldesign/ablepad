@@ -38,6 +38,7 @@ from rig.browser_control import SetBrowserControl
 from rig.boot_checks import build_checks
 from rig.commands import CommandDispatcher
 from rig.controller import RigController
+from rig.mode_switch import ModeSwitch
 from rig.events import AbletonGaveUp, ActionRequested, EventBus
 from rig.exceptions import ConfigError
 from rig.state import RigState, StateMachine
@@ -105,6 +106,11 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     )
 
     supervisor = build_ableton(config, bus)
+
+    # Makes every config's SWITCH_MODE pad real. Without it the 'Browse' pad in
+    # Performance mode arms, fires, and nothing happens -- the Set Browser exists but
+    # is unreachable from the surface.
+    ModeSwitch(bus=bus, machine=machine)
 
     browser = SetBrowserService(sets_dir=Path(config.ableton.sets_dir))
     found = browser.rescan()

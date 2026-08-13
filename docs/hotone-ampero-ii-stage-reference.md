@@ -221,6 +221,51 @@ That is Hotone's proprietary editor/librarian protocol — the channel their PC 
 uses to read and write patches. It is undocumented, it is not performance MIDI, and
 nothing should be built on it.
 
+### Bench runs 2 and 3 — 2026-08-13, after setting footswitch MIDI assignments
+
+Run 2: 90 s, listening on **every** MIDI input, all three openable, **zero messages**.
+
+Run 3: 90 s, with the **Launchpad used as a live indicator** — grid solid green for
+"press now", cyan flash on every arriving message — so the operator could see the
+window rather than reading output that only appears afterwards. Result:
+
+```text
+8 messages, ALL SysEx, ZERO CC, ZERO PC
+prefix 21 25 4D 50   ("!%MP")
+seven of them ~50 ms apart in one burst, with an incrementing byte: 1,2,4,5,7,8
+```
+
+**That burst is a patch dump, not a footswitch event.** Sequence numbers and a
+multi-packet payload are what a librarian protocol looks like. So the USB port is
+alive, the capture works, and the pedal talks — it simply does not speak performance
+MIDI over it.
+
+### Verdict: the design-killing case is now the likely one
+
+Three captures, two of them with the operator able to see the listening window, have
+produced **no CC and no PC over USB** while footswitch MIDI assignments are set.
+Treat the second-controller-over-USB design as **not viable** unless the one remaining
+variable below turns out to explain it.
+
+**The one thing left to check on the device:** MIDI *assignments* and MIDI *output
+routing* are different settings. Assigning CC values to footswitches does nothing if
+MIDI OUT is routed to the TRS jack only. Find the output destination setting and
+confirm whether USB is even an option. If it is, enable it and re-run
+`C:\LiveRig\Tools\ampero_indicated.py`.
+
+**If USB is not an option**, the consequence is hardware, not code:
+
+- a **TRS-to-USB MIDI interface** becomes mandatory kit, in the case, in the power budget
+- Phase 8's Bome question changes shape — Bome would route a *third* physical MIDI
+  port rather than fan out one
+- the rig gains another USB device on a machine already running two hubs, and another
+  thing to enumerate at boot
+
+**One consolation prize worth recording.** The pedal *does* emit an observable burst
+on patch change over USB. It is undocumented, proprietary, and nothing should be built
+on it — but if a "which patch is loaded" signal is ever needed and no PC arrives, that
+burst exists and its sequence numbers are visible. Fragile fallback, not a plan.
+
 > ### What this does and does not prove
 >
 > It shows the USB port carries **no CC/PC as the unit is currently configured**. It

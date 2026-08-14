@@ -123,3 +123,24 @@ def test_a_hold_completes_without_any_further_events(hatch):
         hatch.feed(note, True, 0.0)
     assert not hatch.completed(ESCAPE_HOLD_MS - 1)
     assert hatch.completed(ESCAPE_HOLD_MS), "must complete on a tick, not on input"
+
+
+def test_the_chord_never_uses_a_pad_the_set_browser_binds():
+    # The chord was 18+81 and worked exactly once. 81 is the browser's slot 0, so
+    # after the chord dropped the rig back into the bank, holding it again LOADED A
+    # SET -- and the bank is precisely the context you land in after using this.
+    import json
+    from pathlib import Path
+
+    ROOT = Path(__file__).resolve().parent.parent
+    browser = json.loads((ROOT / "configs" / "set-browser.json").read_text())
+    bound = {
+        int(pad)
+        for pad, b in browser["pads"].items()
+        if (b.get("action") or {}).get("type") not in (None, "NONE")
+    }
+    clash = ESCAPE_NOTES & bound
+    assert not clash, (
+        f"escape chord uses {sorted(clash)}, which the Set Browser also binds — "
+        "the same press would mean two things depending on who owns the surface"
+    )

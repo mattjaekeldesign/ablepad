@@ -74,7 +74,15 @@ __all__ = ["EscapeHatch", "ESCAPE_NOTES", "ESCAPE_HOLD_MS"]
 #: 97 arrives as a CONTROL CHANGE rather than a note -- the 8x8 grid sends notes and
 #: the surrounding frame sends CC (device.py, measured across all 80 controls). The
 #: device layer already turns both into PadEvents, so nothing here has to care.
-ESCAPE_NOTES: frozenset[int] = frozenset({18, 81})
+#: NEITHER MAY BE A PAD THE SET BROWSER USES. The chord was 18+81 and it worked
+#: exactly once: 81 is the browser's slot 0, so the moment the chord dropped the rig
+#: back into the bank, holding it again LOADED A SET instead. A control meaning two
+#: different things depending on who owns the surface will be pressed in the wrong
+#: context -- and the bank is precisely the context you land in after using this.
+#:
+#: The browser binds rows 8 and 7 (81-88, 71-78) plus 19, 91, 92, 98. The bottom row
+#: is free: 11 is bottom-left, 18 is bottom-right.
+ESCAPE_NOTES: frozenset[int] = frozenset({11, 18})
 
 #: Shorter than the old single-pad hold, because the chord IS the safeguard. A
 #: second is long enough to be deliberate when both controls are already down.

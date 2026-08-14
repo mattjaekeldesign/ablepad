@@ -72,6 +72,12 @@ CMD_LED_SLEEP = 0x09  # p.24
 CMD_LED_FEEDBACK = 0x0A  # p.25
 CMD_AFTERTOUCH = 0x0B  # p.26
 CMD_PROGRAMMER_LIVE = 0x0E  # p.7
+CMD_SELECT_LAYOUT = 0x00  # p.7
+
+#: Custom modes 1-4 (p.7). Blanked at handover so the Custom button cannot recall a
+#: stale picture of whatever the rig last painted -- the device keeps one LED buffer
+#: per layout, and a leftover image reads as the rig reacting when it is not.
+CUSTOM_LAYOUTS = (0x04, 0x05, 0x06, 0x07)
 CMD_BRIGHTNESS = 0x08  # p.25
 
 MAX_COLOURSPECS = 81  # p.15. The whole surface in one message — MEASURED, it works.
@@ -298,6 +304,22 @@ class LaunchpadDevice:
         """
         try:
             self.clear()
+            # Blank the CUSTOM layouts too, not just the one we were painting.
+            #
+            # The device keeps a separate LED buffer per layout, so whatever the rig
+            # last drew survives in whichever layout the Custom button selects.
+            # OBSERVED 2026-08-13, three times: pressing Custom during a set recalled
+            # a stale picture of the rig's loading screen, which looks exactly like
+            # the rig reacting to the press and is not -- the rig is released and
+            # painting nothing.
+            #
+            # Selecting a layout to clear it is the only way; LED writes address
+            # whichever layout is current (p.14). Costs four short messages once per
+            # handover, and the surface is already blank at this point so there is
+            # nothing to flicker.
+            for layout in CUSTOM_LAYOUTS:
+                self._send(CMD_SELECT_LAYOUT, layout)
+                self.clear()
             self._send(CMD_PROGRAMMER_LIVE, 0)  # p.7 — back to Live Mode
             log.info("handed the surface to Live Mode (input stays open)")
         except Exception as exc:  # noqa: BLE001 -- a failed handover must not raise

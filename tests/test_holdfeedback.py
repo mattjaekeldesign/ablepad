@@ -125,3 +125,32 @@ def test_hold_progress_beats_the_set_browsers_colour_override():
     lit = {s.index: s.colour for s in render(config, overrides=override,
                                              pressed={81}, holds=held)}
     assert lit[81] == HOLD_RAMP[0], "a held pad shows progress, not the override"
+
+
+def test_handover_blanks_the_custom_layouts_not_just_the_current_one():
+    # The device keeps one LED buffer per layout, so whatever the rig last painted
+    # survives in whichever layout the Custom button selects. OBSERVED three times:
+    # pressing Custom during a set recalled a stale picture of the loading screen,
+    # which looks exactly like the rig reacting and is not.
+    from launchpad.device import CMD_PROGRAMMER_LIVE, CMD_SELECT_LAYOUT, CUSTOM_LAYOUTS
+
+    sent = []
+
+    class FakeDevice:
+        _send = lambda self, *payload: sent.append(payload)  # noqa: E731
+
+        def clear(self):
+            sent.append(("clear",))
+
+        hand_over = None
+
+    from launchpad.device import LaunchpadDevice
+
+    dev = FakeDevice()
+    LaunchpadDevice.hand_over(dev)
+
+    selected = [p[1] for p in sent if p and p[0] == CMD_SELECT_LAYOUT]
+    assert set(selected) == set(CUSTOM_LAYOUTS), "every custom layout must be blanked"
+    assert sent.count(("clear",)) == len(CUSTOM_LAYOUTS) + 1, "each layout, plus the current one"
+    # And Live Mode LAST -- blanking after the switch would fight Live's own painting.
+    assert sent[-1] == (CMD_PROGRAMMER_LIVE, 0)

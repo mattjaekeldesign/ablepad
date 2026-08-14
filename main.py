@@ -161,13 +161,13 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     escape = EscapeHatch()
 
     def on_released_pad(note: int, pressed: bool, now_ms: float) -> None:
-        # Logged because this is the ONLY way to see the Custom layout's note map.
-        # That layout exists only while Ableton owns the device, and in that state
-        # the rig holds interface 2 -- so a standalone capture tool cannot observe
-        # it. A tool run with the controller stopped measures PROGRAMMER mode and
-        # reports 81/88, which look plausible and are the wrong layout entirely.
+        # DEBUG level, not INFO: this fires for every pad a performer touches while
+        # Ableton owns the surface, which during a set is constant. It stays because
+        # it is the only way to see what actually reaches the rig in that state --
+        # every standalone capture tool measures the wrong device mode and looks
+        # convincing doing it. Raise logging to DEBUG when a gesture needs mapping.
         if pressed:
-            log.info("released-surface pad: note %d", note)
+            log.debug("released-surface pad: note %d", note)
         escape.feed(note, pressed, now_ms)
 
     def on_released_tick(now_ms: float) -> None:

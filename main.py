@@ -153,20 +153,35 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
 
     surface.rig_owns_surface = lambda: ownership.rig_owns(machine.state, ableton_ready())
 
-    # The way back to the launcher without quitting Live. MEASURED: with Live
-    # driving interface 1, the Launchpad's CUSTOM layout sends pads to interface 2,
-    # which the rig keeps open while released. Hold the top-left pad for 2 s.
+    # The performer's own kill switch. MEASURED: with Live driving interface 1, the
+    # Launchpad's CUSTOM layout sends pads to interface 2, which the rig keeps open
+    # while released. Hold the 81+97 chord for 1 s (rig/escape_hatch.py) to force
+    # Ableton closed -- graceful first, killed if it will not go, which is what gets
+    # past a "Save changes to <set>?" dialog that nothing headless can answer.
     escape = EscapeHatch()
 
     def on_released_pad(note: int, pressed: bool, now_ms: float) -> None:
+        # Logged because this is the ONLY way to see the Custom layout's note map.
+        # That layout exists only while Ableton owns the device, and in that state
+        # the rig holds interface 2 -- so a standalone capture tool cannot observe
+        # it. A tool run with the controller stopped measures PROGRAMMER mode and
+        # reports 81/88, which look plausible and are the wrong layout entirely.
+        if pressed:
+            log.info("released-surface pad: note %d", note)
         escape.feed(note, pressed, now_ms)
 
     def on_released_tick(now_ms: float) -> None:
         # Every tick, NOT only on input: a hold sends nothing between press and
         # release, so checking on events alone means it can never complete.
-        if escape.wants_surface(now_ms):
-            ownership.take_back()
+        if escape.completed(now_ms):
             escape.reset()
+            if supervisor is not None and supervisor.launcher.is_running():
+                supervisor.force_close("escape chord (81+97 hold)")
+            else:
+                # Nothing to close. Ownership already sits with the rig whenever
+                # Ableton is not running (SurfaceOwner._decide), so there is
+                # nothing to take back either -- just say why the chord did nothing.
+                log.info("escape chord fired but Ableton is not running — nothing to close")
 
     surface.on_released_pad = on_released_pad
     surface.on_released_tick = on_released_tick

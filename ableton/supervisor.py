@@ -59,6 +59,31 @@ class AbletonSupervisor:
         self._watching = None
         self._gave_up = False
 
+    def force_close(self, reason: str) -> None:
+        """
+        The performer is done, and Live is not necessarily going to say so.
+
+        Ends supervision FIRST, then stops the process. Order matters: if stop()
+        ran first, the next poll() would see "not running, no exit code" -- exactly
+        what an ADOPTED crash looks like -- read the crash journal a kill always
+        leaves behind, call it a crash, and spend the restart budget relaunching
+        the set nobody asked for again.
+
+        Publishes AbletonClosed itself rather than waiting for poll() to notice,
+        so a stuck "Save changes to <set>?" dialog -- unanswerable on a rig with no
+        keyboard, and the reason this exists -- runs through the exact same
+        recovery on_ableton_closed already does for a normal quit: surface
+        released, browser reset, back to the Set Browser. No second path to keep
+        in sync with the first.
+        """
+        live_set = self._watching
+        self._watching = None
+        self._gave_up = False
+        self.launcher.stop()
+        if live_set is not None:
+            log.info("Ableton force-closed (%s): %s", live_set.name, reason)
+            self.bus.publish(AbletonClosed(set_name=live_set.name))
+
     def _exit_code(self) -> int | None:
         """Best-effort exit code. Never raises into the tick loop."""
         handle = self.launcher.handle

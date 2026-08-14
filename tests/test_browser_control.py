@@ -215,3 +215,16 @@ def test_the_pulse_stops_when_ableton_gives_up():
     frame = control.led_overrides()
     assert frame[81]["type"] == "static"
     assert frame[81]["palette"] == colors.UNKNOWN_COLOR, "back to the normal browser"
+
+
+def test_a_set_that_was_never_launched_is_not_treated_as_loaded():
+    # OBSERVED 2026-08-13: boot marked boot_set as loaded at wiring time, which was
+    # right when boot launched it immediately and wrong once boot started WAITING for
+    # a choice. The pad then refused with "already loaded" -- a dead pad that looked
+    # like a broken hold.
+    control, launcher, bus, machine = build([live("test")])
+    machine.transition(RigState.SET_BROWSER, "test setup")
+    bus.publish(ActionRequested(action="LOAD_SET", params={"slot": 0}, pad=81))
+    assert launcher.launched == [Path("/sets/test.als")], (
+        "nothing was launched at boot, so the pad must actually load it"
+    )

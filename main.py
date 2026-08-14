@@ -137,9 +137,19 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         # readiness signal is the same evidence the boot gate uses, and the launcher
         # clears it before every start, so it answers for switches too.
         signal = supervisor.launcher.ready_signal
-        if signal is None:
+        if signal is not None and signal.is_ready():
             return True
-        return signal.is_ready()
+
+        # FALL BACK ON TIME. The signal accelerates handover; it must not gate it.
+        #
+        # OBSERVED 2026-08-13: the Ablepad Control Surface had come unselected in
+        # Live (a force-kill loses Preferences.cfg), so no signal was ever written --
+        # and handover never happened. The rig then painted Programmer Mode while
+        # Live drove the same device, the Launchpad showed Ableton's view, and the
+        # escape hatch never armed because the rig was never released. One missing
+        # Remote Script should not cost the whole surface.
+        age = _ableton_age_s()
+        return age is not None and age >= config.rig.boot_settle_s
 
     surface.rig_owns_surface = lambda: ownership.rig_owns(machine.state, ableton_ready())
 
@@ -289,10 +299,16 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     # rather than beside the other AbletonGaveUp handler because browser_control does
     # not exist yet at that point.
     bus.subscribe(AbletonGaveUp, lambda e: browser_control.loading_finished())
-    if config.ableton.boot_set:
-        # Boot already launched this one. Without telling the control, holding its pad
-        # would stop and relaunch a set that is already up -- a pointless silence.
-        browser_control.mark_loaded(Path(config.ableton.boot_set))
+    # NOTHING is marked loaded here. It used to be: boot launched boot_set
+    # immediately, so telling the control that avoided a pointless stop-and-relaunch
+    # when its pad was pressed.
+    #
+    # That stopped being true when boot started WAITING for a choice. Nothing has
+    # launched yet, so marking boot_set loaded made its pad a silent no-op --
+    # OBSERVED 2026-08-13 as "action LOAD_SET from pad 81" immediately followed by
+    # "Test is already loaded", with the hold working perfectly and the rig refusing.
+    #
+    # mark_loaded() now happens where a set is ACTUALLY launched, below.
 
     def start_ableton_once() -> None:
         """
@@ -343,6 +359,9 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         try:
             supervisor.launcher.launch(boot_set)
             supervisor.watch(boot_set)
+            # Marked HERE, where it actually happened -- so its pad is a no-op only
+            # when the set really is up.
+            browser_control.mark_loaded(boot_set)
             log.info("launched Ableton with %s", boot_set)
         except LaunchRefused as exc:
             # Named, once, and then left alone. Boot will fail on its own terms.
@@ -456,6 +475,19 @@ UNIMPLEMENTED: dict[str, str] = {
         "— see docs/ROADMAP.md Phase 6"
     ),
 }
+
+
+def _ableton_age_s() -> float | None:
+    """Seconds since Ableton started, or None if it is not running / unknowable."""
+    try:
+        from windows import probes  # noqa: PLC0415 -- platform import
+
+        proc = probes.process_running()
+        if proc is None:
+            return None
+        return time.time() - proc.create_time()
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _running_ableton() -> int | None:

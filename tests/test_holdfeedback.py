@@ -127,30 +127,49 @@ def test_hold_progress_beats_the_set_browsers_colour_override():
     assert lit[81] == HOLD_RAMP[0], "a held pad shows progress, not the override"
 
 
-def test_handover_blanks_the_custom_layouts_not_just_the_current_one():
-    # The device keeps one LED buffer per layout, so whatever the rig last painted
-    # survives in whichever layout the Custom button selects. OBSERVED three times:
-    # pressing Custom during a set recalled a stale picture of the loading screen,
-    # which looks exactly like the rig reacting and is not.
-    from launchpad.device import CMD_PROGRAMMER_LIVE, CMD_SELECT_LAYOUT, CUSTOM_LAYOUTS
+def test_handover_asserts_programmer_mode_before_blanking():
+    """
+    The LED SysEx (03h) is accepted ONLY in Programmer mode or a Lighting Custom Mode
+    (manual p.15). By handover time Live has put the device into DAW mode, so a clear
+    sent without re-asserting Programmer mode is DISCARDED -- which is why the rig's
+    last screen survived on the pads, and why an earlier fix that blanked four custom
+    layouts changed nothing: none of those writes were accepted either.
+    """
+    from launchpad.device import CMD_PROGRAMMER_LIVE, LaunchpadDevice
 
     sent = []
 
     class FakeDevice:
+        settle_s = 0.0
         _send = lambda self, *payload: sent.append(payload)  # noqa: E731
 
         def clear(self):
             sent.append(("clear",))
 
-        hand_over = None
+    LaunchpadDevice.hand_over(FakeDevice())
 
-    from launchpad.device import LaunchpadDevice
+    assert sent[0] == (CMD_PROGRAMMER_LIVE, 1), "must enter Programmer mode first"
+    assert ("clear",) in sent, "must blank"
+    assert sent.index((CMD_PROGRAMMER_LIVE, 1)) < sent.index(("clear",))
+    assert sent[-1] == (CMD_PROGRAMMER_LIVE, 0), "Live Mode last, or Live cannot paint"
 
-    dev = FakeDevice()
-    LaunchpadDevice.hand_over(dev)
 
-    selected = [p[1] for p in sent if p and p[0] == CMD_SELECT_LAYOUT]
-    assert set(selected) == set(CUSTOM_LAYOUTS), "every custom layout must be blanked"
-    assert sent.count(("clear",)) == len(CUSTOM_LAYOUTS) + 1, "each layout, plus the current one"
-    # And Live Mode LAST -- blanking after the switch would fight Live's own painting.
-    assert sent[-1] == (CMD_PROGRAMMER_LIVE, 0)
+def test_live_mode_is_restored_even_if_blanking_fails():
+    # It used to sit at the end of the try, so any failure above left the device in
+    # Programmer mode with the Setup menu disabled -- the headless brick device.py
+    # exists to prevent.
+    from launchpad.device import CMD_PROGRAMMER_LIVE, LaunchpadDevice
+
+    sent = []
+
+    class BrokenClear:
+        settle_s = 0.0
+
+        def _send(self, *payload):
+            sent.append(payload)
+
+        def clear(self):
+            raise OSError("device went away mid-blank")
+
+    LaunchpadDevice.hand_over(BrokenClear())
+    assert (CMD_PROGRAMMER_LIVE, 0) in sent, "Live Mode must be restored regardless"

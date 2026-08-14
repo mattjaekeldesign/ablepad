@@ -129,7 +129,17 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         Gating on the boot gate means the rig keeps the surface, and its animation,
         until Live can actually drive it.
         """
-        if not (boot_done["v"] and supervisor is not None and supervisor.launcher.is_running()):
+        if supervisor is None:
+            return False
+
+        # Ableton being objectively up and settled is enough, whatever the rig's own
+        # bookkeeping says. boot_done was an unconditional precondition, so ANY path
+        # that never evaluated the gate disabled handover permanently -- and the
+        # adoption deadlock above was exactly such a path. The rig then kept the
+        # surface forever with Ableton running behind it.
+        age = _ableton_age_s()
+        objectively_up = age is not None and age >= config.rig.boot_settle_s
+        if not (boot_done["v"] and supervisor.launcher.is_running()) and not objectively_up:
             return False
         # After the first boot, boot_done stays True forever -- so a SET SWITCH would
         # hand the surface over the instant the new process existed, before Live
@@ -151,7 +161,27 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         age = _ableton_age_s()
         return age is not None and age >= config.rig.boot_settle_s
 
-    surface.rig_owns_surface = lambda: ownership.rig_owns(machine.state, ableton_ready())
+    def rig_owns_surface() -> bool:
+        """
+        Who paints, and the one place a finished load is noticed.
+
+        Handover IS the completion signal: the surface only goes to Ableton when
+        Live can actually drive it. So that is the moment to stop the loading pulse
+        and move the rig into PERFORMANCE -- rather than at the instant the pad was
+        pressed, which is what browser_control used to do and which meant the pulse
+        was never painted while anything was loading.
+        """
+        owns = ownership.rig_owns(machine.state, ableton_ready())
+        if not owns:
+            browser_control.loading_finished()
+            if machine.state is RigState.SET_BROWSER:
+                try:
+                    machine.transition(RigState.PERFORMANCE, "SET_READY")
+                except Exception:  # noqa: BLE001 -- a table quirk must not stop the loop
+                    log.exception("could not enter PERFORMANCE on handover")
+        return owns
+
+    surface.rig_owns_surface = rig_owns_surface
 
     # The performer's own kill switch. MEASURED: with Live driving interface 1, the
     # Launchpad's CUSTOM layout sends pads to interface 2, which the rig keeps open
@@ -167,7 +197,11 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         # every standalone capture tool measures the wrong device mode and looks
         # convincing doing it. Raise logging to DEBUG when a gesture needs mapping.
         if pressed:
-            log.debug("released-surface pad: note %d", note)
+            # INFO while the escape hatch is still being proven on hardware. This is
+            # the only window into what the device sends once Ableton owns it, and
+            # with it at DEBUG a failed gesture is indistinguishable from a gesture
+            # that never arrived. Drop it back to debug once the chord is trusted.
+            log.info("released-surface pad: note %d", note)
         escape.feed(note, pressed, now_ms)
 
     def on_released_tick(now_ms: float) -> None:
@@ -443,6 +477,29 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         # Matt hit on the first cold boot. The default still loads, so an unattended
         # rig behaves as before; this only buys a few seconds for a hand that is
         # already there.
+        # ADOPT BEFORE THE WINDOW, not inside start_ableton_once().
+        #
+        # This check used to live in start_ableton_once(), which sits BELOW the
+        # choice window's return -- so with boot_requires_choice it was unreachable.
+        # An already-running Ableton was never adopted, launcher.is_running() stayed
+        # False because it had no handle, boot_done never became True, and
+        # ableton_ready() could never return True. The rig therefore NEVER released
+        # the surface: it went on painting Programmer Mode into whatever layout the
+        # device was showing, which is why pressing Custom appeared to summon the
+        # set bank. Nothing was reacting to that button; the bank simply followed
+        # the layout.
+        if not choice_window.chosen and supervisor is not None:
+            existing = _running_ableton()
+            if existing is not None and supervisor.launcher.handle is None:
+                supervisor.launcher.adopt(existing)
+                supervisor.watch(Path(config.ableton.boot_set) if config.ableton.boot_set else None)
+                choice_window.skip("Ableton was already running")
+                log.warning(
+                    "Ableton was already running (pid %d) — adopted it. There is "
+                    "nothing to choose when a set is already loaded.",
+                    existing,
+                )
+
         # Returning here also means the boot GATE is not evaluated, which is what
         # stops its 90 s deadline running while the rig is waiting for a human.
         # Otherwise waiting for a choice would become a boot failure.

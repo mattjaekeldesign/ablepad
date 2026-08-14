@@ -34,7 +34,6 @@ from ableton.supervisor import AbletonSupervisor
 from launchpad import colors
 from launchpad.mappings import ModeConfig
 from rig.events import ActionRequested, EventBus
-from rig.exceptions import IllegalTransition
 from rig.state import RigState, StateMachine
 from set_browser.service import SetBrowserService
 
@@ -117,8 +116,12 @@ class SetBrowserControl:
         blue among them, so the contrast has to come from the pad going dark. That is
         also the most visible pulse available, which suits a signal read at a glance.
 
-        The end of this state needs no code: a successful load hands the surface to
-        Ableton, and a failed one goes to Error Mode. Both replace the whole screen.
+        ENDING IT DOES need code, contrary to what this said. "A successful load
+        hands the surface to Ableton, so the screen is replaced" is true about PIXELS
+        and false about STATE: the flag survived, and any later return to the browser
+        (pad 98, Error Mode's retry, the escape chord) painted a stale pulse over a
+        bank with no sets visible. main.py clears it at handover, which is the moment
+        the load is genuinely finished.
         """
         phase = (self.clock() % 1.4) / 1.4
         bright = phase < 0.5
@@ -179,19 +182,14 @@ class SetBrowserControl:
             return
         self._loaded = live_set.path
         self._loading_pad = self._slot_pads.get(slot)
+        # NOTE: deliberately NOT transitioning to PERFORMANCE here. Doing so made the
+        # browser stop being the active screen the instant a load began, so the
+        # loading pulse was never painted while anything was loading -- it only ever
+        # appeared later, stale, which is the opposite of what it is for. main.py
+        # moves the rig to PERFORMANCE when the surface is actually handed to
+        # Ableton, which is the moment the set really is up.
         if self.supervisor is not None:
             self.supervisor.watch(live_set.path)
-        try:
-            self.machine.transition(RigState.PERFORMANCE, f"SET_LOADED {live_set.display_name}")
-        except IllegalTransition as exc:
-            # The set IS loaded -- Ableton is running it. Refusing to move state is a
-            # table problem, not a reason to take the rig down mid-load, and this
-            # runs inside an event handler on the tick loop. Loud, and survivable.
-            log.error(
-                "loaded %s but could not enter PERFORMANCE: %s. The set is running; "
-                "the state machine disagrees, which is a bug in the transition table.",
-                live_set.display_name, exc,
-            )
 
     @property
     def loaded(self) -> Path | None:

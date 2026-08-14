@@ -125,7 +125,11 @@ def test_holding_slot_zero_loads_the_first_set():
     machine.transition(RigState.SET_BROWSER, "test setup")  # where loads happen from
     bus.publish(ActionRequested(action="LOAD_SET", params={"slot": 0}, pad=81))
     assert launcher.launched == [Path("/sets/test.als")]
-    assert machine.state is RigState.PERFORMANCE
+    # State stays SET_BROWSER: main.py moves to PERFORMANCE when the surface is
+    # actually handed to Ableton. Transitioning here made the browser stop being the
+    # active screen instantly, so the loading pulse was never painted while anything
+    # was loading -- it only ever appeared later, stale.
+    assert machine.state is RigState.SET_BROWSER
 
 
 def test_loading_stops_the_running_set_first():

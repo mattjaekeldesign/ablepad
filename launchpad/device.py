@@ -74,10 +74,14 @@ CMD_AFTERTOUCH = 0x0B  # p.26
 CMD_PROGRAMMER_LIVE = 0x0E  # p.7
 CMD_SELECT_LAYOUT = 0x00  # p.7
 
-#: Custom modes 1-4 (p.7). Blanked at handover so the Custom button cannot recall a
-#: stale picture of whatever the rig last painted -- the device keeps one LED buffer
-#: per layout, and a leftover image reads as the rig reacting when it is not.
-CUSTOM_LAYOUTS = (0x04, 0x05, 0x06, 0x07)
+#: Lighting Custom Modes, the only custom layouts that accept LED writes at all
+#: (p.9: "Custom mode 3 and Custom mode 4 are set up for lighting pads"). 04h and 05h
+#: are Drum Rack and Keys and ignore 03h entirely.
+#:
+#: NOT used at handover. Blanking one of these AUTOMATICALLY ENABLES GHOST MODE
+#: (p.9), a persistent device change with no documented way to undo it -- too high a
+#: price for a cosmetic artifact, and paid on every single handover.
+LIGHTING_CUSTOM_MODES = (0x06, 0x07)
 CMD_BRIGHTNESS = 0x08  # p.25
 
 MAX_COLOURSPECS = 81  # p.15. The whole surface in one message — MEASURED, it works.
@@ -298,32 +302,50 @@ class LaunchpadDevice:
         the rig can still hear the escape gesture that takes it back
         (rig/escape_hatch.py). Closing would work too and would be deaf.
 
-        Blanking first matters: Live's script paints what it wants to paint, and
-        whatever the rig left lit would otherwise sit there underneath until Live
-        happened to overwrite that pad.
+        RE-ASSERT PROGRAMMER MODE FIRST, and this is the whole point.
+            The LED lighting SysEx (03h) is accepted ONLY in Programmer mode and in
+            Lighting Custom Modes -- manual p.15, first sentence. By the time this
+            runs, Live has been up long enough to put the device into DAW mode on
+            interface 1, so the device is in NEITHER. A clear sent here is simply
+            discarded, and the rig's last screen stays on the pads.
+
+            That is why "press Custom and the loading screen is still there" survived
+            an earlier fix that blanked four custom layouts: none of those writes
+            were accepted either. Asserting 0Eh 01 first is the missing instruction.
+
+        WHY NOT ALSO CLEAR THE CUSTOM LAYOUTS
+            An earlier version selected 04h-07h and blanked each. Two of those
+            (Drum Rack, Keys) are not Lighting Custom Modes at all (p.7, p.9), so
+            those writes were no-ops. And blanking a Lighting Custom Mode
+            AUTOMATICALLY ENABLES GHOST MODE (p.9) -- a persistent device change with
+            no documented way to undo it, made silently on every handover. Not worth
+            it for a cosmetic artifact.
+
+            Whether Programmer mode and the Lighting Custom Modes share one lighting
+            state is UNVERIFIED; the manual never says. If the stale image survives
+            this fix, that is the bench test to run.
+
+        Live Mode is sent in a FINALLY. It used to sit at the end of the try, so any
+        failure above it left the device in Programmer mode with the Setup menu
+        disabled -- the headless brick this module exists to prevent.
         """
         try:
+            # The device may be in DAW mode; 03h is ignored there.
+            self._send(CMD_PROGRAMMER_LIVE, 1)
+            time.sleep(self.settle_s)
             self.clear()
-            # Blank the CUSTOM layouts too, not just the one we were painting.
-            #
-            # The device keeps a separate LED buffer per layout, so whatever the rig
-            # last drew survives in whichever layout the Custom button selects.
-            # OBSERVED 2026-08-13, three times: pressing Custom during a set recalled
-            # a stale picture of the rig's loading screen, which looks exactly like
-            # the rig reacting to the press and is not -- the rig is released and
-            # painting nothing.
-            #
-            # Selecting a layout to clear it is the only way; LED writes address
-            # whichever layout is current (p.14). Costs four short messages once per
-            # handover, and the surface is already blank at this point so there is
-            # nothing to flicker.
-            for layout in CUSTOM_LAYOUTS:
-                self._send(CMD_SELECT_LAYOUT, layout)
-                self.clear()
-            self._send(CMD_PROGRAMMER_LIVE, 0)  # p.7 — back to Live Mode
-            log.info("handed the surface to Live Mode (input stays open)")
-        except Exception as exc:  # noqa: BLE001 -- a failed handover must not raise
-            log.warning("could not hand over cleanly: %s", exc)
+        except Exception as exc:  # noqa: BLE001 -- a failed blank must not raise
+            log.warning("could not blank the surface before handover: %s", exc)
+        finally:
+            try:
+                self._send(CMD_PROGRAMMER_LIVE, 0)  # p.7 -- back to Live Mode
+                log.info("handed the surface to Live Mode (input stays open)")
+            except Exception as exc:  # noqa: BLE001
+                log.error(
+                    "COULD NOT RESTORE LIVE MODE (%s) — the Setup menu may be "
+                    "disabled until the device is replugged",
+                    exc,
+                )
 
     def reassert(self) -> None:
         """

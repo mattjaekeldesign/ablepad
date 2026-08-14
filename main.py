@@ -43,6 +43,7 @@ from rig.commands import CommandDispatcher
 from rig.controller import RigController
 from rig.mode_switch import ModeSwitch
 from rig.escape_hatch import EscapeHatch
+from rig.hotkeys import Hotkey, HotkeyControl
 from rig.lifeline import WifiLifeline
 from rig.system_commands import Reboot, RestartAbleton, Shutdown
 from rig.surface_owner import SurfaceOwner
@@ -451,6 +452,69 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         ready=ready_to_choose,
     )
 
+    # The three-key strip: system control that survives a performance.
+    #
+    # The Launchpad cannot carry these. MEASURED 2026-08-13: while Ableton owns the
+    # surface only GRID pads reach the rig, their note map belongs to whichever
+    # Custom layout is loaded, and it moved under us on a firmware update. The frame
+    # buttons never arrive at all. A separate device removes the whole problem and
+    # leaves the Launchpad entirely Ableton's.
+    hotkeys = None
+    if config.hotkeys.enabled:
+        try:
+            from windows.hotkeys import (  # noqa: PLC0415 -- platform import
+                VK_F13,
+                VK_F14,
+                VK_F15,
+                WindowsHotkeys,
+            )
+
+            def back_to_browser() -> None:
+                """Force-close Live and land on the bank. Past any save dialog."""
+                if supervisor is None or not supervisor.launcher.is_running():
+                    log.info("F13: nothing is running to close")
+                    return
+                supervisor.force_close("key strip")
+
+            def restart_current_set() -> None:
+                """Relaunch whatever is loaded -- the first thing to try when a set misbehaves."""
+                try:
+                    dispatcher.dispatch("ABLETON_RESTART", {"source": "key strip"})
+                except Exception:  # noqa: BLE001
+                    log.exception("F15: restart failed")
+
+            def reboot_machine() -> None:
+                try:
+                    dispatcher.dispatch("SYSTEM_REBOOT", {"source": "key strip"})
+                except Exception:  # noqa: BLE001
+                    log.exception("F14: reboot failed")
+
+            hotkeys = HotkeyControl(
+                reader=WindowsHotkeys(),
+                clock=time.monotonic,
+                keys=(
+                    Hotkey(VK_F13, "F13 set browser", config.hotkeys.browser_hold_ms,
+                           back_to_browser),
+                    Hotkey(VK_F15, "F15 restart Live", config.hotkeys.restart_hold_ms,
+                           restart_current_set),
+                    Hotkey(VK_F14, "F14 reboot", config.hotkeys.reboot_hold_ms,
+                           reboot_machine),
+                ),
+            )
+            log.info(
+                "key strip armed: F13 browser (%d ms), F15 restart (%d ms), "
+                "F14 reboot (%d ms)",
+                config.hotkeys.browser_hold_ms,
+                config.hotkeys.restart_hold_ms,
+                config.hotkeys.reboot_hold_ms,
+            )
+        except Exception as exc:  # noqa: BLE001 -- not on Windows
+            log.warning("key strip unavailable (%s)", exc)
+
+    def hotkey_tick() -> None:
+        if hotkeys is not None:
+            hotkeys.poll()
+
     def lifeline_tick() -> None:
         """Cheap every tick; the lifeline rate-limits itself to its retry interval."""
         if lifeline is not None:
@@ -536,6 +600,7 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
             boot_tick,
             (lambda: supervisor.poll()) if supervisor else (lambda: None),
             lifeline_tick,
+            hotkey_tick,
             lambda: surface.tick(time.monotonic() * 1000.0),
         ],
     )

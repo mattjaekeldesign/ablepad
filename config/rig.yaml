@@ -133,6 +133,28 @@ ableton:
   appdata_dir: "C:\\Users\\rigma\\AppData\\Roaming\\Ableton"
   crash_quarantine_dir: "C:\\LiveRig\\Logs\\crash-quarantine"
 
+hotkeys:
+  # The three-key USB strip that carries system control DURING a performance.
+  #
+  # Why not the Launchpad: MEASURED 2026-08-13, while Ableton owns the surface only
+  # GRID pads reach the rig, their note map belongs to whichever Custom layout is
+  # loaded, and a firmware update moved it (11/18 became 36/47/71). The frame buttons
+  # never arrive at all. Every gesture built there was fragile or sat on pads Matt
+  # plays. A separate device removes the problem and leaves the Launchpad entirely
+  # Ableton's -- Session, Note and his own Components layouts, untouched.
+  #
+  # ASSIGN THE STRIP TO F13, F14, F15. The rig does NOT consume the keystroke, so
+  # whatever has focus sees it too -- a key Ableton binds would fire Live's shortcut
+  # as well. No physical keyboard has F13-F15 and Live binds nothing to them.
+  #
+  # Hold times track what a mistake costs, the same rule the pads use. Every one is a
+  # hold: the strip sits where hands and feet are, and a knock must not stop the
+  # audio mid-song.
+  enabled: true
+  browser_hold_ms: 1000   # F13 -> force-close Live, back to the Set Browser
+  restart_hold_ms: 2000   # F15 -> restart Live on the SAME set, keeps your place
+  reboot_hold_ms: 4000    # F14 -> reboot the machine
+
 network:
   # The way back IN when everything else has failed. MEASURED 2026-08-13: this
   # Beelink's Intel AX101 reports "Hosted network supported: No", so it cannot BE an

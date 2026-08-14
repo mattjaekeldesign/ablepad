@@ -75,6 +75,24 @@ class LaunchpadSection:
 
 
 @dataclass(frozen=True)
+class HotkeySection:
+    """
+    The three-key USB strip that carries system control during a performance.
+
+    Enabled by default because the alternative -- putting these on the Launchpad --
+    was measured to be unworkable: while Ableton owns the surface only grid pads
+    reach the rig, and their note map belongs to whichever Custom layout is loaded.
+
+    Hold times track how much a mistake costs, the same rule the pads use.
+    """
+
+    enabled: bool = True
+    browser_hold_ms: int = 1000   # back to the Set Browser; costs a moment of silence
+    restart_hold_ms: int = 2000   # restart Live on the same set; keeps your place
+    reboot_hold_ms: int = 4000    # a walk to the machine
+
+
+@dataclass(frozen=True)
 class NetworkSection:
     """
     The offline lifeline. Empty ssid disables it, which is the honest default for a
@@ -132,6 +150,7 @@ class RigConfig:
     audio_interface: AudioSection
     ableton: AbletonSection
     network: NetworkSection
+    hotkeys: HotkeySection
     logging: LoggingSection
 
 
@@ -208,6 +227,7 @@ def load_config(path: Path) -> RigConfig:
     appdata_dir = ableton_raw.get("appdata_dir", "")
     crash_quarantine_dir = ableton_raw.get("crash_quarantine_dir", "")
 
+    hk_raw = raw.get("hotkeys") or {}
     net_raw = raw.get("network") or {}
     lifeline_ssid = net_raw.get("lifeline_ssid", "")
     lifeline_retry = net_raw.get("retry_interval_s", 20.0)
@@ -240,6 +260,12 @@ def load_config(path: Path) -> RigConfig:
             restart_attempts=int(restart_attempts), restart_stable_s=float(restart_stable_s),
             appdata_dir=str(appdata_dir), crash_quarantine_dir=str(crash_quarantine_dir),
             ready_signal_path=str(ready_signal_path),
+        ),
+        hotkeys=HotkeySection(
+            enabled=bool(hk_raw.get("enabled", True)),
+            browser_hold_ms=int(hk_raw.get("browser_hold_ms", 1000)),
+            restart_hold_ms=int(hk_raw.get("restart_hold_ms", 2000)),
+            reboot_hold_ms=int(hk_raw.get("reboot_hold_ms", 4000)),
         ),
         network=NetworkSection(
             lifeline_ssid=str(lifeline_ssid), retry_interval_s=float(lifeline_retry)

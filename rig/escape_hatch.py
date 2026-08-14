@@ -23,11 +23,17 @@ WHAT MADE IT POSSIBLE  (MEASURED 2026-08-13, tools/listen_interface2.py)
     taken with the controller force-killed, which leaves the device in PROGRAMMER
     mode, so it measured the wrong layout and looked entirely plausible doing it.
 
-    The chord below uses 81 and 97, which is what Matt asked for. If the gesture
-    does not fire, that is the first thing to check: main.py logs every event that
-    reaches the released surface ("released-surface pad: note N"), and those numbers
-    are the truth. Do not re-measure with a standalone tool -- the layout only exists
-    while Ableton owns the device, and in that state the rig holds the port.
+    The chord is 18 and 81 -- opposite diagonal corners, and BOTH GRID PADS. An
+    earlier version paired 81 with 97, a round button, and 97 never arrived: the
+    grid sends NOTES to interface 2 where the rig can see them, while the frame
+    sends CC to interface 1, which belongs to Live. Round buttons are Live's while
+    Ableton owns the device, and pressing one changes LIVE's view -- which looks
+    like the rig reacting and is not.
+
+    If a gesture does not fire, main.py logs every event reaching the released
+    surface at DEBUG ("released-surface pad: note N"); those numbers are the truth.
+    Do not re-measure with a standalone tool -- the state only exists while Ableton
+    owns the device, and in that state the rig holds the port.
 
 WHY A CHORD, AND WHY A HOLD AS WELL
     A hold, because the escape must not fire from a brushed control: taking the
@@ -68,7 +74,7 @@ __all__ = ["EscapeHatch", "ESCAPE_NOTES", "ESCAPE_HOLD_MS"]
 #: 97 arrives as a CONTROL CHANGE rather than a note -- the 8x8 grid sends notes and
 #: the surrounding frame sends CC (device.py, measured across all 80 controls). The
 #: device layer already turns both into PadEvents, so nothing here has to care.
-ESCAPE_NOTES: frozenset[int] = frozenset({81, 97})
+ESCAPE_NOTES: frozenset[int] = frozenset({18, 81})
 
 #: Shorter than the old single-pad hold, because the chord IS the safeguard. A
 #: second is long enough to be deliberate when both controls are already down.

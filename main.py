@@ -176,7 +176,7 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         if escape.completed(now_ms):
             escape.reset()
             if supervisor is not None and supervisor.launcher.is_running():
-                supervisor.force_close("escape chord (81+97 hold)")
+                supervisor.force_close("escape chord")
             else:
                 # Nothing to close. Ownership already sits with the rig whenever
                 # Ableton is not running (SurfaceOwner._decide), so there is

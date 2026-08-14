@@ -193,6 +193,28 @@ class LaunchpadService:
             except Exception as exc:  # noqa: BLE001
                 self._lost("re-acquiring", exc)
 
+    def reassert(self) -> None:
+        """
+        Force Programmer Mode and every device setting again, without a reconnect.
+
+        Needed when something ELSE has driven the device while the rig held it.
+        OBSERVED 2026-08-13: Ableton was already running when the rig started, so
+        Live's control surface put the device into DAW mode on interface 1 while the
+        rig went on painting Programmer Mode on interface 2. The rig's writes landed
+        on a device that was no longer in the mode they assumed, so the surface kept
+        showing Live's view and nothing the rig painted appeared -- including after
+        Live quit and left it that way.
+
+        acquire() does this too, but only after a release; this is for the case where
+        the rig never let go and the device changed underneath it anyway.
+        """
+        if self._device is None:
+            return
+        try:
+            self._device.reassert()
+        except Exception as exc:  # noqa: BLE001
+            self._lost("re-asserting", exc)
+
     def close(self) -> None:
         """Restore Live Mode and let go. Safe to call any number of times."""
         if self._device is not None:

@@ -159,3 +159,32 @@ def test_a_broken_readiness_probe_does_not_strand_boot():
                         ready=boom)
     assert choice.waiting(now[0]) is True
     assert machine.state is RigState.SET_BROWSER, "fall through rather than stall"
+
+
+def test_an_already_running_ableton_skips_the_question():
+    # OBSERVED 2026-08-13: the rig adopted a running Ableton, then sat in the browser
+    # waiting for a choice -- painting Programmer Mode on interface 2 while Live drove
+    # the same device into DAW mode on interface 1. Live won, and the Launchpad showed
+    # Ableton's view with the rig convinced it owned the surface.
+    #
+    # An adopted process is a set that is already loaded, so "which set?" has no
+    # answer worth asking.
+    now = [0.0]
+    bus = EventBus()
+    machine = StateMachine(bus=bus)
+    choice = BootChoice(seconds=8.0, clock=lambda: now[0], machine=machine, bus=bus,
+                        require_choice=True)
+    choice.waiting(now[0])
+    choice.skip("Ableton was already running")
+    assert choice.waiting(now[0]) is False
+    assert choice.chosen is True
+
+
+def test_skipping_twice_is_harmless():
+    now = [0.0]
+    bus = EventBus()
+    machine = StateMachine(bus=bus)
+    choice = BootChoice(seconds=8.0, clock=lambda: now[0], machine=machine, bus=bus)
+    choice.skip("first")
+    choice.skip("second")
+    assert choice.waiting(now[0]) is False

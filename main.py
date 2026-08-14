@@ -174,6 +174,11 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         log.info("Ableton closed (%s) — taking the launchpad back", event.set_name)
         ownership.release_override()  # normal rules again; nothing is playing now
         escape.reset()
+        # Live may have left the device in DAW mode and its own layout. If the rig
+        # never released the surface there is no acquire() to put that right, so say
+        # it explicitly -- otherwise the Launchpad keeps showing Ableton's view with
+        # Ableton gone.
+        service.reassert()
         browser_control.loading_finished()
         browser_control.forget_loaded()
         if machine.state is not RigState.SET_BROWSER:
@@ -322,6 +327,10 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
             # marked as loaded in the browser: an unnecessary reload is harmless,
             # while a wrong no-op would leave a pad that silently does nothing.
             supervisor.watch(boot_set)
+            # A set is already loaded, so there is nothing to choose -- and sitting
+            # in the browser would have the rig painting Programmer Mode while Live
+            # drives the same device into DAW mode.
+            choice_window.skip("Ableton was already running")
             log.warning(
                 "Ableton was already running (pid %d) — adopted it instead of "
                 "launching a second instance. Only one process can own the EVO's "

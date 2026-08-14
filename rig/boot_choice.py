@@ -124,6 +124,20 @@ class BootChoice:
             return False
         return True
 
+    def skip(self, reason: str) -> None:
+        """
+        Close the window without choosing. For when there is nothing to choose.
+
+        Used when Ableton is ALREADY running as the rig starts -- an adopted process
+        is a set that is already loaded, so asking which one to launch is a question
+        with no answer, and sitting in the browser means the rig paints Programmer
+        Mode while Live drives the same device into DAW mode.
+        """
+        if self._done:
+            return
+        log.info("skipping the set choice: %s", reason)
+        self._finish(chosen=True)
+
     def _on_action(self, event: ActionRequested) -> None:
         if event.action == "LOAD_SET" and not self._done:
             # The press IS the choice. Counting down afterwards would either load two

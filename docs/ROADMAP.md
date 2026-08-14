@@ -662,6 +662,64 @@ vary by firmware.
 
 ---
 
+## 4c. Security posture — what actually protects this rig
+
+Matt's requirement, 2026-08-13: *"i want this computer to have a chance against a
+hacker on my local network, but i really dont want the added boot time."*
+
+Those are not in tension, because **real-time antivirus is largely not the control
+that answers that threat**. It scans files. A network attacker arrives through
+listening services. Measured on the rig, before:
+
+```text
+22    sshd                    key auth — keep
+135/139/445  RPC + SMB        the classic LAN surface
+5040  Connected Devices
+5357  WSD network discovery
+5800  TightVNC WEB viewer     a second way in that nothing used
+5900  TightVNC                allowed on ANY profile — reachable from a venue LAN
+7680  Delivery Optimization   peer-to-peer Windows Update
+49668 print spooler           no printer, long history of remote exploits
+```
+
+Applied (`tools/harden-network.ps1`, `tools/harden-vnc.ps1`), none of which costs
+boot time:
+
+- inbound **blocked by default** on all three firewall profiles
+- **SMB server, print spooler, WSD/SSDP/UPnP discovery disabled** — 135/139/445 clear
+  after a reboot
+- **VNC web viewer (5800) off**; nothing used it, the phone connects on 5900
+- **VNC restricted to the Private profile** — over Tailscale or a network explicitly
+  marked trusted, NOT whatever wifi a venue runs
+
+Only then was real-time protection disabled, for the ~25 s it cost every boot.
+
+### The part that does not stick by itself
+
+`Set-MpPreference -DisableRealtimeMonitoring` is NOT durable — Windows re-enables
+real-time protection on its own when no other antivirus is registered. The policy
+value is what Defender honours:
+
+```text
+HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection
+    DisableRealtimeMonitoring = 1
+```
+
+Changing it at all requires **Tamper Protection off**, by design.
+
+### What is still protected, and the habit that goes with it
+
+Scheduled scans are off (`ScanScheduleDay 8`) and scan CPU is capped at 15% — that
+matters more than boot time, because a scan starting mid-set with the old 50% CPU
+allowance is a dropout. Exclusions cover `C:\LiveRig` (including `namirs`), VST3,
+`ProgramData\Ableton` and `Documents\Ableton`.
+
+**Turn real-time back on when installing plugins**: `tools\av-toggle.ps1 on`, then
+`off` afterwards. A downloaded installer is exactly the case real-time AV is good at,
+and it is the one path this configuration leaves open.
+
+---
+
 ## 5. Known limitations (accepted, documented)
 
 - Set switching will interrupt audio. Not solvable without two Live instances.

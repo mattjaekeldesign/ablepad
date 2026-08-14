@@ -55,6 +55,15 @@ from rig.state import RigState, StateMachine
 
 log = logging.getLogger(__name__)
 
+#: The device's own layout buttons, in Programmer-mode CC numbering. Pressing one
+#: changes which layout the device shows -- and therefore which layout the rig's LED
+#: writes land in. MEASURED 2026-08-13: pressing Custom sends CC 97 to the rig's
+#: interface while the rig owns the device.
+#:
+#: Only meaningful while the rig OWNS the surface. Once handed to Ableton these
+#: belong to Live, go to interface 1, and the rig never sees them.
+LAYOUT_BUTTONS: frozenset[int] = frozenset({95, 96, 97})
+
 __all__ = ["Surface", "Hold"]
 
 
@@ -239,6 +248,21 @@ class Surface:
     # -- input ------------------------------------------------------------
 
     def _on_pad(self, event: PadEvent, config: ModeConfig | None, now_ms: float) -> None:
+        if event.pressed and self._is_unbound_layout_button(event.note, config):
+            # The performer changed the device's LAYOUT while the rig owns the
+            # surface. The rig goes on painting, and LED writes land on whichever
+            # layout is current -- so its screen gets written into that layout's
+            # buffer and is still there hours later, recalled by the same button.
+            # That is the "press Custom, see the loading screen" artifact, and it
+            # cannot be cleaned up afterwards: blanking a Lighting Custom Mode
+            # permanently enables Ghost Mode (manual p.9).
+            #
+            # So do not let it happen. Snap straight back to Programmer Mode: while
+            # the rig owns the surface, the rig's layout is the only correct one.
+            log.info("layout button %d pressed — re-asserting Programmer Mode", event.note)
+            self.service.reassert()
+            return
+
         if event.pressed:
             self._pressed.add(event.note)
             # Any press skips an intro — §22. The player ignores this for during-loops.
@@ -248,6 +272,24 @@ class Surface:
         else:
             self._pressed.discard(event.note)
             self._release(event.note, now_ms)
+
+    def _is_unbound_layout_button(self, note: int, config: ModeConfig | None) -> bool:
+        """
+        A layout button that THIS mode does not use for anything.
+
+        The binding has to win. System Mode puts ABLETON_RESTART on 95 and
+        SYSTEM_REBOOT on 97 -- treating those as layout buttons would silently kill
+        two of the rig's three troubleshooting pads, and the reboot pad failing
+        quietly is exactly the kind of thing found at the worst moment.
+
+        So: bound means it does its job; unbound means it is the device's own layout
+        control and the rig snaps back rather than letting its screen be written into
+        another layout.
+        """
+        if note not in LAYOUT_BUTTONS:
+            return False
+        binding = config.pads.get(note) if config is not None else None
+        return binding is None or binding.action.type == "NONE"
 
     def _press(self, pad: int, config: ModeConfig | None, now_ms: float) -> None:
         if config is None:

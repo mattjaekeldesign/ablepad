@@ -434,7 +434,13 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         if choice_window.waiting(time.monotonic()):
             return
 
-        start_ableton_once()
+        # A set was picked, so it is already launching -- SetBrowserControl did it the
+        # moment the pad fired. Running the boot launcher now would "adopt" the
+        # process it just started and re-point crash recovery at boot_set instead of
+        # the set actually chosen. OBSERVED 2026-08-13 as "loading Test" immediately
+        # followed by "Ableton was already running ... adopted it".
+        if not choice_window.chosen:
+            start_ableton_once()
         outcome = gate.evaluate()
         if outcome is BootOutcome.COMPLETE:
             boot_done["v"] = True

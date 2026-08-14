@@ -24,8 +24,10 @@ SWITCHING SETS INTERRUPTS AUDIO
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from ableton.launcher import AbletonLauncher, LaunchRefused
 from ableton.supervisor import AbletonSupervisor
@@ -50,8 +52,16 @@ class SetBrowserControl:
     launcher: AbletonLauncher | None = None
     supervisor: AbletonSupervisor | None = None
 
+    #: Wall clock in SECONDS, for the loading pulse. Injected so the pulse is
+    #: host-driven: the Launchpad's own flash and pulse lighting types are slaved to
+    #: its MIDI beat clock, not to wall time (roadmap §5), so anything that must
+    #: track real seconds has to be repainted by us.
+    clock: "Callable[[], float]" = time.monotonic
+
     _slot_pads: dict[int, int] = field(default_factory=dict, init=False)
     _loaded: Path | None = field(default=None, init=False)
+    #: The pad whose set is loading right now, or None. Drives the pulse.
+    _loading_pad: int | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         for pad, binding in self.config.pads.items():
@@ -73,6 +83,9 @@ class SetBrowserControl:
         screen is a promise that something will load, and a pad that lies about that
         is worse than a dark one — you find out by standing in silence.
         """
+        if self._loading_pad is not None:
+            return self._loading_frame()
+
         page = self.browser.current_page()
         overrides: dict[int, dict] = {}
         for slot, pad in self._slot_pads.items():
@@ -82,6 +95,39 @@ class SetBrowserControl:
             else:
                 overrides[pad] = {"type": "off"}
         return overrides
+
+    def _loading_frame(self) -> dict[int, dict]:
+        """
+        One pad pulsing, everything else dark: "this set is loading, nothing else is".
+
+        OBSERVED 2026-08-13: after the hold completed there was no sign anything had
+        happened -- "i dont really have clear confirmation that the application
+        booted... the lights dont indicate a failed attempt vs successful". Ableton
+        takes ~25 s to load and the surface sat unchanged through all of it, which
+        also makes the hold itself feel longer than it is.
+
+        BLUE, and blue on purpose. Every other colour on this screen means "a set is
+        sitting here" -- green for a set, red for the emergency one, and the hold ramp
+        borrows red/yellow/green too. Blue is used by nothing else, so it cannot be
+        misread as anything but "Ableton got the message".
+
+        Pulsed rather than lit because a steady pad is what the browser already shows;
+        movement is what says WORKING. Blue against OFF rather than two blues: only
+        eight palette indices have been confirmed on this hardware and there is one
+        blue among them, so the contrast has to come from the pad going dark. That is
+        also the most visible pulse available, which suits a signal read at a glance.
+
+        The end of this state needs no code: a successful load hands the surface to
+        Ableton, and a failed one goes to Error Mode. Both replace the whole screen.
+        """
+        phase = (self.clock() % 1.4) / 1.4
+        bright = phase < 0.5
+        frame: dict[int, dict] = {pad: {"type": "off"} for pad in self._slot_pads.values()}
+        frame[self._loading_pad] = {
+            "type": "static",
+            "palette": colors.BLUE if bright else colors.OFF,
+        }
+        return frame
 
     # -- what the surface reports ----------------------------------------
 
@@ -132,6 +178,7 @@ class SetBrowserControl:
             self.machine.transition(RigState.ERROR, f"cannot load {live_set.display_name}")
             return
         self._loaded = live_set.path
+        self._loading_pad = self._slot_pads.get(slot)
         if self.supervisor is not None:
             self.supervisor.watch(live_set.path)
         try:
@@ -150,6 +197,10 @@ class SetBrowserControl:
     def loaded(self) -> Path | None:
         """The set currently playing, as far as the browser knows."""
         return self._loaded
+
+    def loading_finished(self) -> None:
+        """Stop the pulse. Called when Ableton is up, or when it has given up."""
+        self._loading_pad = None
 
     def forget_loaded(self) -> None:
         """

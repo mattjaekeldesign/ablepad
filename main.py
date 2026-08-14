@@ -129,11 +129,17 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         Gating on the boot gate means the rig keeps the surface, and its animation,
         until Live can actually drive it.
         """
-        return (
-            boot_done["v"]
-            and supervisor is not None
-            and supervisor.launcher.is_running()
-        )
+        if not (boot_done["v"] and supervisor is not None and supervisor.launcher.is_running()):
+            return False
+        # After the first boot, boot_done stays True forever -- so a SET SWITCH would
+        # hand the surface over the instant the new process existed, before Live
+        # could paint anything, and the loading pulse would never be seen. The
+        # readiness signal is the same evidence the boot gate uses, and the launcher
+        # clears it before every start, so it answers for switches too.
+        signal = supervisor.launcher.ready_signal
+        if signal is None:
+            return True
+        return signal.is_ready()
 
     surface.rig_owns_surface = lambda: ownership.rig_owns(machine.state, ableton_ready())
 
@@ -168,6 +174,7 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         log.info("Ableton closed (%s) — taking the launchpad back", event.set_name)
         ownership.release_override()  # normal rules again; nothing is playing now
         escape.reset()
+        browser_control.loading_finished()
         browser_control.forget_loaded()
         if machine.state is not RigState.SET_BROWSER:
             machine.transition(RigState.SET_BROWSER, f"ABLETON_CLOSED {event.set_name}")
@@ -271,6 +278,12 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
     # The surface asks for these each tick while the Set Browser is showing. It never
     # learns what a set is; it asks for pad colours and paints them.
     surface.overrides_for["set-browser"] = browser_control.led_overrides
+
+    # A load that never came up: stop the pulse, or the surface goes on claiming to
+    # be working while Error Mode is trying to say the opposite. Subscribed HERE
+    # rather than beside the other AbletonGaveUp handler because browser_control does
+    # not exist yet at that point.
+    bus.subscribe(AbletonGaveUp, lambda e: browser_control.loading_finished())
     if config.ableton.boot_set:
         # Boot already launched this one. Without telling the control, holding its pad
         # would stop and relaunch a set that is already up -- a pointless silence.
@@ -496,16 +509,19 @@ def build_ableton(config: RigConfig, bus: EventBus) -> AbletonSupervisor | None:
             "with no keyboard"
         )
 
+    # One instance, shared: the launcher CLEARS it before each start, and the
+    # handover rule READS it to know when Live can actually drive the surface.
+    ready_signal = (
+        ReadySignal(Path(config.ableton.ready_signal_path))
+        if config.ableton.ready_signal_path
+        else None
+    )
     launcher = AbletonLauncher(
         exe=Path(config.ableton.exe),
         processes=PsutilProcessController(),
         audio=EvoPresence(),
         recovery=recovery,
-        ready_signal=(
-            ReadySignal(Path(config.ableton.ready_signal_path))
-            if config.ableton.ready_signal_path
-            else None
-        ),
+        ready_signal=ready_signal,
     )
     budget = RestartBudget(
         # ONE automatic restart. A restart that crashes again quickly means something

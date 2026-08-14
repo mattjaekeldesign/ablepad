@@ -178,3 +178,40 @@ def test_rescan_finding_nothing_is_an_error_state():
     bus.publish(ActionRequested(action="RESCAN_SETS", params={}, pad=19))
     assert control.browser.rescans == 1
     assert machine.state is RigState.ERROR
+
+
+# --- loading feedback ----------------------------------------------------
+
+
+def test_a_loading_set_pulses_and_everything_else_goes_dark():
+    # OBSERVED: after the hold completed, nothing changed for the ~25 s Ableton takes
+    # to load -- "i dont really have clear confirmation that the application booted".
+    # Movement is what says WORKING; a steady pad is what the browser already shows.
+    now = [0.0]
+    control, launcher, bus, machine = build([live("test"), live("emergency")])
+    control.clock = lambda: now[0]
+    machine.transition(RigState.SET_BROWSER, "test setup")
+    bus.publish(ActionRequested(action="LOAD_SET", params={"slot": 0}, pad=81))
+
+    seen = set()
+    for t in (0.0, 0.35, 0.7, 1.05):
+        now[0] = t
+        frame = control.led_overrides()
+        assert frame[82] == {"type": "off"}, "the other sets go dark while one loads"
+        seen.add(frame[81]["palette"])
+    assert len(seen) > 1, "the loading pad must MOVE, not sit there"
+    # Blue specifically: every other colour here means "a set is sitting there", and
+    # the hold ramp uses red/yellow/green. Blue is used by nothing else on this
+    # screen, so it can only mean "Ableton got the message".
+    assert colors.BLUE in seen
+
+
+def test_the_pulse_stops_when_ableton_gives_up():
+    # Otherwise the surface claims to be working while Error Mode says the opposite.
+    control, _, bus, machine = build([live("test")])
+    machine.transition(RigState.SET_BROWSER, "test setup")
+    bus.publish(ActionRequested(action="LOAD_SET", params={"slot": 0}, pad=81))
+    control.loading_finished()
+    frame = control.led_overrides()
+    assert frame[81]["type"] == "static"
+    assert frame[81]["palette"] == colors.UNKNOWN_COLOR, "back to the normal browser"

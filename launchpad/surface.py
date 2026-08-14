@@ -248,6 +248,14 @@ class Surface:
     # -- input ------------------------------------------------------------
 
     def _on_pad(self, event: PadEvent, config: ModeConfig | None, now_ms: float) -> None:
+        if event.pressed:
+            # Every press while the rig OWNS the surface. The counterpart of main.py's
+            # released-surface logging, and needed for the same reason: the device's
+            # layout buttons were guessed at (95/96/97) rather than measured, and an
+            # unbound press is otherwise completely silent. Drop to debug once the
+            # layout-button set is confirmed on firmware 0422.
+            log.info("owned-surface pad: note %d", event.note)
+
         if event.pressed and self._is_unbound_layout_button(event.note, config):
             # The performer changed the device's LAYOUT while the rig owns the
             # surface. The rig goes on painting, and LED writes land on whichever

@@ -35,6 +35,28 @@ messages; it needs one SysEx. Python-side LED animation is viable.
 
 ---
 
+## 1a. Firmware — CHANGED 2026-08-13
+
+The device was updated to **2.0.1**, which reports as `0422` in the device-inquiry
+reply. Everything measured before that date was on **`0351`** (2026-08-12).
+
+That matters more here than a version bump usually does. The facts this repo treats
+as measured — the 9x9 note/CC map, Programmer Mode behaviour, LED lighting rules,
+and per-layout LED persistence — were all established against `0351`. A major
+firmware revision is entitled to change any of them, and the layout/LED behaviour is
+exactly the sort of thing such a release touches.
+
+CONFIRMED still true on `0422`:
+- ports unchanged (`MIDIIN2 (LPX MIDI) 1` / `MIDIOUT2 (LPX MIDI) 2`)
+- device inquiry parses; family byte still accepted
+- Programmer Mode entry and the device-settings sequence still work
+
+NOT yet re-verified on `0422`: the note/CC map, the palette indices, the layout
+buttons' CC numbers, and whether LED state persists per layout. Re-measure before
+relying on any of them.
+
+---
+
 ## 1b. MEASURED ON HARDWARE — 2026-08-12
 
 First bench session, Beelink `RIG`, Launchpad X firmware **0.3.5.1**, over SSH. Everything

@@ -55,15 +55,6 @@ from rig.state import RigState, StateMachine
 
 log = logging.getLogger(__name__)
 
-#: The device's own layout buttons, in Programmer-mode CC numbering. Pressing one
-#: changes which layout the device shows -- and therefore which layout the rig's LED
-#: writes land in. MEASURED 2026-08-13: pressing Custom sends CC 97 to the rig's
-#: interface while the rig owns the device.
-#:
-#: Only meaningful while the rig OWNS the surface. Once handed to Ableton these
-#: belong to Live, go to interface 1, and the rig never sees them.
-LAYOUT_BUTTONS: frozenset[int] = frozenset({95, 96, 97})
-
 __all__ = ["Surface", "Hold"]
 
 
@@ -99,18 +90,6 @@ class Surface:
     #: belongs to Ableton. Injected rather than computed here: the surface knows
     #: about pads and modes, not about whether a DAW is running.
     rig_owns_surface: "Callable[[], bool]" = field(default=lambda: True)
-    #: Called with (note, pressed, now_ms) for raw pad traffic arriving while the
-    #: surface belongs to Ableton. The Custom layout's note map is nothing like
-    #: Programmer Mode's, so these are NOT run through the mode configs.
-    on_released_pad: "Callable[[int, bool, float], None] | None" = None
-    #: Called EVERY TICK while the surface belongs to Ableton, with now_ms.
-    #:
-    #: Separate from on_released_pad because a HOLD produces no events between press
-    #: and release. Evaluating it only on input means a 7-second hold is still
-    #: "in progress" at the moment the release clears it -- measured exactly that way
-    #: on the rig. This mirrors _expire_holds(), which is why owned-surface holds
-    #: always worked.
-    on_released_tick: "Callable[[float], None] | None" = None
 
     _last_state: RigState | None = field(default=None, init=False)
     #: Most recent tick time, so intro_playing can be asked outside the tick.
@@ -124,8 +103,7 @@ class Surface:
         """One frame. Never raises: the service swallows device faults already."""
         self._last_frame_ms = now_ms
         if not self._own_surface():
-            self._listen_while_released(now_ms)
-            return
+            return  # the device is closed and belongs to Ableton
         config = self._config_for_current_state()
         self._arm_on_state_change(config, now_ms)
 
@@ -151,23 +129,6 @@ class Surface:
             self._on_pad(event, config, now_ms)
 
         self._expire_holds(now_ms)
-
-    def _listen_while_released(self, now_ms: float) -> None:
-        """
-        Read the device without painting it, so the escape gesture can be heard.
-
-        The service returns raw events in this state. They are handed straight out;
-        interpreting them against a ModeConfig would be wrong twice over -- the note
-        map differs, and the rig is not showing any of those pads.
-        """
-        try:
-            for event in self.service.tick(now_ms / 1000.0, None):
-                if self.on_released_pad is not None:
-                    self.on_released_pad(event.note, event.pressed, now_ms)
-            if self.on_released_tick is not None:
-                self.on_released_tick(now_ms)
-        except Exception:  # noqa: BLE001 -- never break the loop over a lost escape
-            log.exception("failed reading the released surface")
 
     def _own_surface(self) -> bool:
         """
@@ -249,27 +210,12 @@ class Surface:
 
     def _on_pad(self, event: PadEvent, config: ModeConfig | None, now_ms: float) -> None:
         if event.pressed:
-            # Every press while the rig OWNS the surface. The counterpart of main.py's
-            # released-surface logging, and needed for the same reason: the device's
-            # layout buttons were guessed at (95/96/97) rather than measured, and an
-            # unbound press is otherwise completely silent. Drop to debug once the
-            # layout-button set is confirmed on firmware 0422.
-            log.info("owned-surface pad: note %d", event.note)
-
-        if event.pressed and self._is_unbound_layout_button(event.note, config):
-            # The performer changed the device's LAYOUT while the rig owns the
-            # surface. The rig goes on painting, and LED writes land on whichever
-            # layout is current -- so its screen gets written into that layout's
-            # buffer and is still there hours later, recalled by the same button.
-            # That is the "press Custom, see the loading screen" artifact, and it
-            # cannot be cleaned up afterwards: blanking a Lighting Custom Mode
-            # permanently enables Ghost Mode (manual p.9).
-            #
-            # So do not let it happen. Snap straight back to Programmer Mode: while
-            # the rig owns the surface, the rig's layout is the only correct one.
-            log.info("layout button %d pressed — re-asserting Programmer Mode", event.note)
-            self.service.reassert()
-            return
+            # DEBUG, not INFO: this fires for every pad touched while the rig owns the
+            # surface. Kept because an unbound press is otherwise completely silent,
+            # and that silence is what hid a whole afternoon of wrong assumptions
+            # about which controls reach the rig. MEASURED: the frame buttons --
+            # Custom, Session, Note -- never arrive at all.
+            log.debug("owned-surface pad: note %d", event.note)
 
         if event.pressed:
             self._pressed.add(event.note)
@@ -280,24 +226,6 @@ class Surface:
         else:
             self._pressed.discard(event.note)
             self._release(event.note, now_ms)
-
-    def _is_unbound_layout_button(self, note: int, config: ModeConfig | None) -> bool:
-        """
-        A layout button that THIS mode does not use for anything.
-
-        The binding has to win. System Mode puts ABLETON_RESTART on 95 and
-        SYSTEM_REBOOT on 97 -- treating those as layout buttons would silently kill
-        two of the rig's three troubleshooting pads, and the reboot pad failing
-        quietly is exactly the kind of thing found at the worst moment.
-
-        So: bound means it does its job; unbound means it is the device's own layout
-        control and the rig snaps back rather than letting its screen be written into
-        another layout.
-        """
-        if note not in LAYOUT_BUTTONS:
-            return False
-        binding = config.pads.get(note) if config is not None else None
-        return binding is None or binding.action.type == "NONE"
 
     def _press(self, pad: int, config: ModeConfig | None, now_ms: float) -> None:
         if config is None:

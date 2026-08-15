@@ -142,34 +142,45 @@ class LaunchpadService:
 
     def release(self) -> None:
         """
-        Hand the surface to Ableton: Live Mode, stop painting -- but KEEP LISTENING.
+        Hand the surface to Ableton: Live Mode, stop painting, and LET GO of the port.
 
         MUST restore Live Mode rather than merely closing the port. Programmer Mode
         is device-wide state, and Live's Launchpad X script drives the Session
         layout -- leaving the device in Programmer Mode hands Ableton a surface that
         answers on the wrong layout and lights nothing where it expects.
 
-        The input port stays OPEN, which is the difference between a handover and a
-        disconnect. MEASURED 2026-08-13: with Live driving interface 1, pressing the
-        Launchpad's Custom button routes pad traffic to interface 2 -- this port.
-        That is the only channel by which a performer can ask for the launcher back
-        without quitting Live, and closing here would make the rig deaf to it.
+        The port is CLOSED as well. It used to stay open so the rig could hear an
+        escape gesture during a performance -- but that gesture is gone: system
+        control lives on a dedicated key strip, which nothing competes for.
+
+        Closing matters. Custom layouts send on interface 2, and Matt drives Ableton
+        with them; a rig holding that port is a rig in the way. Letting go is what
+        makes the Launchpad wholly Ableton's during a set.
 
         Idempotent, and safe while already disconnected.
         """
         if self._released:
             return
         self._released = True
-        if self._device is not None:
-            log.info("releasing the launchpad to Ableton (still listening)")
-            try:
-                self._device.hand_over()
-            except Exception as exc:  # noqa: BLE001
-                log.warning("handover failed, closing instead: %s", exc)
-                self._safe_close(self._device)
-                self._device = None
-        else:
+        if self._device is None:
             log.info("launchpad marked released (nothing was connected)")
+            return
+
+        log.info("releasing the launchpad to Ableton")
+        device, self._device = self._device, None
+        try:
+            # Blank and return to Live Mode BEFORE letting go of the port. See
+            # LaunchpadDevice.hand_over(): it must re-assert Programmer Mode first,
+            # or the blank is discarded by a device Live has put into DAW mode.
+            device.hand_over()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("handover was not clean: %s", exc)
+        finally:
+            # And CLOSE. The rig used to keep the input open to listen for an escape
+            # gesture; system control now lives on a dedicated key strip, so holding
+            # interface 2 buys nothing and costs something real -- Custom layouts
+            # send on that port, and Matt uses them to drive Ableton.
+            self._safe_close(device, restore=False)
 
     def acquire(self) -> None:
         """
@@ -264,12 +275,8 @@ class LaunchpadService:
         instant and feeling like it has a delay on it.
         """
         if self._released:
-            # Do NOT paint -- that would fight Ableton for the surface. DO read: in
-            # Live Mode the grid is silent on this port until the performer selects
-            # a Custom layout, and those presses are the escape gesture. They are
-            # returned raw; the caller decides what they mean, because the Custom
-            # layout's note map is nothing like Programmer Mode's.
-            return self.poll()
+            # Neither paint nor read: the device is closed and belongs to Ableton.
+            return []
         self.ensure_connected(now)
         events = self.poll()
         if specs:

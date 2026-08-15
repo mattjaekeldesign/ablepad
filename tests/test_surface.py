@@ -238,36 +238,27 @@ def test_the_real_boot_config_renders_and_arms_its_intro():
     assert len(service.painted[-1]) == 81
 
 
-def test_a_layout_button_bound_by_the_config_still_does_its_job():
-    # system.json puts ABLETON_RESTART on 95 and SYSTEM_REBOOT on 97. Treating those
-    # as device layout buttons would silently kill two of the three troubleshooting
-    # pads -- and a reboot pad that does nothing is found at the worst moment.
-    from launchpad.surface import LAYOUT_BUTTONS
+def test_the_frame_buttons_are_not_special_cased():
+    """
+    MEASURED 2026-08-14/15: Custom, Session and Note never reach the rig at all --
+    pressing them logged nothing in either ownership state. An earlier version
+    treated 95/96/97 as layout buttons and snapped the device back to Programmer
+    Mode; that code could never fire, and it nearly broke System Mode, which binds
+    95 to ABLETON_RESTART and 97 to SYSTEM_REBOOT.
 
-    note = sorted(LAYOUT_BUTTONS)[0]
-    pads = {note: PadBinding(
-        pad=note, label="Restart", led={"idle": {"type": "off"}},
-        action=Action("ABLETON_RESTART", {}, 0),
-    )}
+    So a frame button is an ordinary pad here: bound means it acts, unbound means
+    nothing happens.
+    """
+    pads = {95: binding(95, "ABLETON_RESTART", None)}
     surface, service, seen = build(pads)
-    service.pending = [PadEvent(note=note, velocity=127, pressed=True)]
+    service.pending = [PadEvent(note=95, velocity=127, pressed=True)]
     surface.tick(now_ms=0)
     fired = [e for e in seen if isinstance(e, ActionRequested)]
     assert [e.action for e in fired] == ["ABLETON_RESTART"]
 
 
-def test_an_unbound_layout_button_snaps_back_to_programmer_mode():
-    # Pressing Custom while the rig owns the surface changes which layout the rig's
-    # LED writes land in, so its screen ends up stored in that layout and is recalled
-    # by the same button hours later. Blanking it afterwards is not an option: that
-    # permanently enables Ghost Mode (manual p.9).
-    from launchpad.surface import LAYOUT_BUTTONS
-
-    note = sorted(LAYOUT_BUTTONS)[-1]
+def test_an_unbound_frame_button_does_nothing():
     surface, service, seen = build({})
-    service.reasserts = 0
-    service.reassert = lambda: setattr(service, "reasserts", service.reasserts + 1)
-    service.pending = [PadEvent(note=note, velocity=127, pressed=True)]
+    service.pending = [PadEvent(note=97, velocity=127, pressed=True)]
     surface.tick(now_ms=0)
-    assert service.reasserts == 1
-    assert not [e for e in seen if isinstance(e, ActionRequested)]
+    assert seen == []

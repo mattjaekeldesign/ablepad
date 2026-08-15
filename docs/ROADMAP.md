@@ -761,12 +761,22 @@ If the strip cannot reach F13–F24, in order of preference: media/consumer keys
 ignores them, though Windows may route them elsewhere), then Ctrl+Alt+Shift+letter.
 Plain letters only with proof that Live binds nothing to them.
 
-### Follow-up once the strip is proven
+### DONE 2026-08-15 — the rig now lets go of interface 2
 
-The rig should then stop holding Launchpad interface 2 altogether, so Custom layouts
-reach Ableton with nothing in the way. That deletes the escape-hatch machinery — the
-chord, the released-surface listening, `force_close` from pads — which exists only
-because system control had nowhere else to live.
+The strip is verified (F13 force-closed Live and returned the bank in 1.6 s, with the
+Launchpad belonging to Ableton throughout), so the escape-hatch machinery is gone:
+the chord, the released-surface listening, `force_close` from pads, and the
+layout-button snap-back that could never fire because those buttons never reach the
+rig at all.
+
+`LaunchpadService.release()` now CLOSES the port rather than keeping input open.
+That is the point of the whole exercise: Custom layouts send on interface 2, Matt
+drives Ableton with them, and a rig holding that port is a rig in the way. During a
+set the Launchpad is wholly Ableton's — Session, Note and his own Components layouts,
+with nothing competing.
+
+Net: ~200 lines and a whole class of confusion removed, replaced by a device nothing
+else wants.
 
 ---
 

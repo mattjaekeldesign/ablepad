@@ -42,7 +42,6 @@ from rig.boot_checks import build_checks
 from rig.commands import CommandDispatcher
 from rig.controller import RigController
 from rig.mode_switch import ModeSwitch
-from rig.escape_hatch import EscapeHatch
 from rig.hotkeys import Hotkey, HotkeyControl
 from rig.lifeline import WifiLifeline
 from rig.system_commands import Reboot, RestartAbleton, Shutdown
@@ -156,9 +155,9 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         # OBSERVED 2026-08-13: the Ablepad Control Surface had come unselected in
         # Live (a force-kill loses Preferences.cfg), so no signal was ever written --
         # and handover never happened. The rig then painted Programmer Mode while
-        # Live drove the same device, the Launchpad showed Ableton's view, and the
-        # escape hatch never armed because the rig was never released. One missing
-        # Remote Script should not cost the whole surface.
+        # Live drove the same device and the Launchpad showed Ableton's view with
+        # the rig convinced it owned the surface. One missing Remote Script should
+        # not cost the whole handover.
         age = _ableton_age_s()
         return age is not None and age >= config.rig.boot_settle_s
 
@@ -184,42 +183,6 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
 
     surface.rig_owns_surface = rig_owns_surface
 
-    # The performer's own kill switch. MEASURED: with Live driving interface 1, the
-    # Launchpad's CUSTOM layout sends pads to interface 2, which the rig keeps open
-    # while released. Hold the 81+97 chord for 1 s (rig/escape_hatch.py) to force
-    # Ableton closed -- graceful first, killed if it will not go, which is what gets
-    # past a "Save changes to <set>?" dialog that nothing headless can answer.
-    escape = EscapeHatch()
-
-    def on_released_pad(note: int, pressed: bool, now_ms: float) -> None:
-        # DEBUG level, not INFO: this fires for every pad a performer touches while
-        # Ableton owns the surface, which during a set is constant. It stays because
-        # it is the only way to see what actually reaches the rig in that state --
-        # every standalone capture tool measures the wrong device mode and looks
-        # convincing doing it. Raise logging to DEBUG when a gesture needs mapping.
-        if pressed:
-            # INFO while the escape hatch is still being proven on hardware. This is
-            # the only window into what the device sends once Ableton owns it, and
-            # with it at DEBUG a failed gesture is indistinguishable from a gesture
-            # that never arrived. Drop it back to debug once the chord is trusted.
-            log.info("released-surface pad: note %d", note)
-        escape.feed(note, pressed, now_ms)
-
-    def on_released_tick(now_ms: float) -> None:
-        # Every tick, NOT only on input: a hold sends nothing between press and
-        # release, so checking on events alone means it can never complete.
-        if escape.completed(now_ms):
-            escape.reset()
-            if supervisor is not None and supervisor.launcher.is_running():
-                supervisor.force_close("escape chord")
-            else:
-                # Nothing to close. Ownership already sits with the rig whenever
-                # Ableton is not running (SurfaceOwner._decide), so there is
-                # nothing to take back either -- just say why the chord did nothing.
-                log.info("escape chord fired but Ableton is not running — nothing to close")
-
-    surface.on_released_pad = on_released_pad
-    surface.on_released_tick = on_released_tick
     if not config.launchpad.handover_to_ableton:
         log.info("launchpad handover disabled — the rig keeps the surface at all times")
 
@@ -233,7 +196,6 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         """
         log.info("Ableton closed (%s) — taking the launchpad back", event.set_name)
         ownership.release_override()  # normal rules again; nothing is playing now
-        escape.reset()
         # Live may have left the device in DAW mode and its own layout. If the rig
         # never released the surface there is no acquire() to put that right, so say
         # it explicitly -- otherwise the Launchpad keeps showing Ableton's view with
@@ -320,7 +282,6 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
         """A set is loading, so hand the surface back to Ableton once it is up."""
         if event.action == "LOAD_SET":
             ownership.release_override()
-            escape.reset()
 
     bus.subscribe(ActionRequested, on_load_requested)
 

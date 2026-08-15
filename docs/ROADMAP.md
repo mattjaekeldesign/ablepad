@@ -720,6 +720,56 @@ and it is the one path this configuration leaves open.
 
 ---
 
+## 4d. System control during a performance — the key strip
+
+The Launchpad cannot carry it. MEASURED 2026-08-13/14: while Ableton owns the
+surface only GRID pads reach the rig, their note map belongs to whichever Custom
+layout is loaded, and a firmware update moved it (bottom corners 11/18 -> 36/47/71,
+silently breaking the escape chord). The frame buttons — Custom, Session, Note —
+never arrive at all. Every gesture built there was either fragile or sat on pads that
+get played, and Matt plays all of them.
+
+A dedicated three-key USB strip solves it by removing the rig from the contested
+device entirely. The Launchpad becomes wholly Ableton's — Session, Note and Matt's
+own Components layouts, untouched.
+
+```text
+F13   1000 ms   force-close Live, back to the Set Browser
+F15   2000 ms   restart Live on the SAME set
+F14   4000 ms   reboot
+```
+
+Every one is a hold, and the length tracks what a mistake costs — the same rule the
+pads use. A tap was the first proposal for the browser key and was wrong: the strip
+sits where hands and feet are, and a knock must not stop the audio mid-song.
+
+### The strip must be reconfigured — F13–F15, not letters
+
+MEASURED 2026-08-15, strip VID_3553 PID_C011: out of the box the three keys send
+**A, B and C**. The rig sees them correctly (`tools/keystrip_probe.py`, run in the
+interactive session), so the mechanism works — but those codes are unusable.
+
+**The rig does not consume the keystroke.** Whatever window has focus receives it
+too, and Live binds letters — `B` is Draw Mode, `A` toggles Automation. Wired as
+shipped, every system command would also act on the running set.
+
+F13–F15 exist in Windows, appear on no physical keyboard, and Live binds nothing to
+them. Configure the strip's own software to send them; the rig already listens for
+exactly those and needs no change.
+
+If the strip cannot reach F13–F24, in order of preference: media/consumer keys (Live
+ignores them, though Windows may route them elsewhere), then Ctrl+Alt+Shift+letter.
+Plain letters only with proof that Live binds nothing to them.
+
+### Follow-up once the strip is proven
+
+The rig should then stop holding Launchpad interface 2 altogether, so Custom layouts
+reach Ableton with nothing in the way. That deletes the escape-hatch machinery — the
+chord, the released-surface listening, `force_close` from pads — which exists only
+because system control had nowhere else to live.
+
+---
+
 ## 5. Known limitations (accepted, documented)
 
 - Set switching will interrupt audio. Not solvable without two Live instances.

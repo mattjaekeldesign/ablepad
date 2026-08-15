@@ -152,8 +152,8 @@ hotkeys:
   # audio mid-song.
   enabled: true
   browser_hold_ms: 1000   # F13 -> force-close Live, back to the Set Browser
-  restart_hold_ms: 2000   # F15 -> restart Live on the SAME set, keeps your place
-  reboot_hold_ms: 4000    # F14 -> reboot the machine
+  restart_hold_ms: 2000   # F14 -> restart Live on the SAME set, keeps your place
+  reboot_hold_ms: 4000    # F15 -> reboot the machine
 
 network:
   # The way back IN when everything else has failed. MEASURED 2026-08-13: this

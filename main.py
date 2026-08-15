@@ -495,15 +495,15 @@ def build(config: RigConfig, root: Path) -> tuple[RigController, Surface]:
                 keys=(
                     Hotkey(VK_F13, "F13 set browser", config.hotkeys.browser_hold_ms,
                            back_to_browser),
-                    Hotkey(VK_F15, "F15 restart Live", config.hotkeys.restart_hold_ms,
+                    Hotkey(VK_F14, "F14 restart Live", config.hotkeys.restart_hold_ms,
                            restart_current_set),
-                    Hotkey(VK_F14, "F14 reboot", config.hotkeys.reboot_hold_ms,
+                    Hotkey(VK_F15, "F15 reboot", config.hotkeys.reboot_hold_ms,
                            reboot_machine),
                 ),
             )
             log.info(
-                "key strip armed: F13 browser (%d ms), F15 restart (%d ms), "
-                "F14 reboot (%d ms)",
+                "key strip armed: F13 browser (%d ms), F14 restart Live (%d ms), "
+                "F15 reboot (%d ms)",
                 config.hotkeys.browser_hold_ms,
                 config.hotkeys.restart_hold_ms,
                 config.hotkeys.reboot_hold_ms,
